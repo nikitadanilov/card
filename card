@@ -22,7 +22,9 @@ import datetime
 import collections
 import html
 from typing import List, Dict, Optional, Tuple
+from typeguard import typechecked # Must be installed.
 
+@typechecked
 class kv:
     """Base class for deck, card and fragment.
 
@@ -33,7 +35,7 @@ class kv:
     def __init__(self, parent : Optional[kv]):
         self.attrs  = {}
         self.parent = parent
-    def set(self, key : str, value : str) -> None:
+    def set(self, key : str, value) -> None:
         """Sets the attribute. If attribute name starts with '+', then the value
         is added to the list.
 
@@ -59,6 +61,7 @@ class kv:
     def __str__(self) -> str:
         return '\n'.join(self.tostring())
     
+@typechecked
 class frag(kv):
     def __init__(self, c : card):
         kv.__init__(self, c)
@@ -72,13 +75,16 @@ class frag(kv):
     def tostring(self) -> List[str]:
         return self.astring() + ['{'] + self.indent(8, self.lines) + ['}']
 
+@typechecked
 class para(frag):
     pass
 
+@typechecked
 class code(frag):
     def content(self) -> str: # Do not strip the code
         return ''.join(self.lines)
 
+@typechecked
 class math(frag):
     pass
 
@@ -88,11 +94,12 @@ frag_types = {
     'math' : math
 }
 
+@typechecked
 class card(kv):
     def __init__(self, d : deck):
         kv.__init__(self, d)
         self.frags = []
-    def frag_add(self, f : frag) -> None:
+    def frag_add(self, f : Optional[frag]) -> None:
         if f != None:
             assert(f.parent == self)
             f.set('seq', len(self.frags))
@@ -111,6 +118,7 @@ class card(kv):
     def tostring(self) -> List[str]:
         return self.astring() + ['['] + self.indent(8, sum([f.tostring() for f in self.frags], [])) + [']']
 
+@typechecked
 class deck(kv):
     def __init__(self):
         kv.__init__(self, None)
@@ -146,11 +154,13 @@ class deck(kv):
     def tostring(self) -> List[str]:
         return self.astring() + ['<'] + self.indent(8, sum([c.tostring() for c in self.cards], [])) + ['>']
 
+@typechecked
 class span:
     def __init__(self, obj : kv, regex : str):
         self.obj = obj
         self.regex = regex
 
+@typechecked
 class link:
     def __init__(self, d : deck, obj : kv, s : str):
         self.deck = d
@@ -184,9 +194,11 @@ class link:
             loc = loc.strip()
         (obj if host == None else host).set(attr, self)
             
+@typechecked
 class eng:
     pass
 
+@typechecked
 class html_eng(eng):
     def __init__(self):
         self.series = {}
@@ -250,6 +262,7 @@ engines = {
     'html' : html_eng
 }
     
+@typechecked
 def cardread(rolodex : deck, file : str) -> None:
     seq = 0
     fd  = open(file, 'r')
