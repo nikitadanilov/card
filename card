@@ -41,9 +41,7 @@ class kv:
         assert len(key) > 0
         if key[0] == '+':
             key = key[1:]
-            if key not in self.attrs:
-                self.attrs[key] = []
-            self.attrs[key] += [value]
+            self.attrs[key] = self.attrs.get(key, []) + [value]
         else:
             self.attrs[key] = value
     def get(self, key, ttype : type = str, default = None):
