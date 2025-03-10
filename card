@@ -1,0 +1,308 @@
+#!/usr/bin/env python3
+# -*- python -*-
+
+"""A very simple "publishing" (I guess) tool, designed for a particular
+workflow.
+
+The input is a "deck", which is a set of "cards", each consisting of
+"fragments". Fragments correspond to paragraphs and things like code and math
+displays in the output. Cards are used to ogranise content into "series", they
+can correspond to pages in the output, but not necessarily.
+
+Decks, cards and fragments all have attributes.
+
+"""
+
+from __future__ import annotations
+import sys
+import pprint
+import argparse
+import os
+import datetime
+import collections
+import html
+from typing import List, Dict, Optional, Tuple
+
+class kv:
+    """Base class for deck, card and fragment.
+
+    kv knows has a parent kv, a dictionary of attributes and can pretty-print
+    itself.
+
+    """
+    def __init__(self, parent : Optional[kv]):
+        self.attrs  = {}
+        self.parent = parent
+    def set(self, key : str, value : str) -> None:
+        """Sets the attribute. If attribute name starts with '+', then the value
+        is added to the list.
+
+        """
+        assert len(key) > 0
+        if key[0] == '+':
+            key = key[1:]
+            if key not in self.attrs:
+                self.attrs[key] = []
+            self.attrs[key] += [value]
+        else:
+            self.attrs[key] = value
+    def get(self, key, ttype : type = str, default = None):
+        return ttype(self.attrs.get(key)) if self.has(key) else default
+    def has(self, key : str) -> bool:
+        return key in self.attrs
+    def makeseq(self, base : str) -> str:
+        return (base + '-' + '{:05}'.format(self.get('seq', int, None))).replace(' ', '-')
+    def indent(self, n : int, lines : List[str]) -> List[str]:
+        return [n * ' ' + x.rstrip('\n') for x in lines]
+    def astring(self) -> List[str]:
+        return ['{} : {}'.format(key, self.attrs[key]) for key in self.attrs]
+    def tostring(self) -> List[str]:
+        return self.astring()
+    def __str__(self) -> str:
+        return '\n'.join(self.tostring())
+    
+class frag(kv):
+    def __init__(self, c : card):
+        kv.__init__(self, c)
+        self.lines = []
+    def add(self, line : str):
+        self.lines += [line]
+    def content(self) -> str:
+        return ''.join(self.lines).strip()
+    def id(self) -> str:
+        return self.makeseq(self.parent.id())
+    def tostring(self) -> List[str]:
+        return self.astring() + ['{'] + self.indent(8, self.lines) + ['}']
+
+class para(frag):
+    pass
+
+class code(frag):
+    def content(self) -> str: # Do not strip the code
+        return ''.join(self.lines)
+
+class math(frag):
+    pass
+
+frag_types = {
+    'para' : para,
+    'code' : code,
+    'math' : math
+}
+
+class card(kv):
+    def __init__(self, d : deck):
+        kv.__init__(self, d)
+        self.frags = []
+    def frag_add(self, f : frag) -> None:
+        if f != None:
+            assert(f.parent == self)
+            f.set('seq', len(self.frags))
+            self.frags += [f]
+    def id(self) -> str:
+        assert self.has('id') or self.has('file')
+        return self.get('id') if self.has('id') else self.makeseq(self.get('file'))
+    def fromfile(d : deck, file : str, fd : file, seq : int) -> card:
+        c = card(d)
+        stats = os.fstat(fd.fileno())
+        c.set('file', file)
+        c.set('seq', seq)
+        c.set('mtime', datetime.datetime.fromtimestamp(stats.st_mtime))
+        c.set('ctime', datetime.datetime.fromtimestamp(stats.st_ctime))
+        return c
+    def tostring(self) -> List[str]:
+        return self.astring() + ['['] + self.indent(8, sum([f.tostring() for f in self.frags], [])) + [']']
+
+class deck(kv):
+    def __init__(self):
+        kv.__init__(self, None)
+        self.cards = []
+    def add(self, c : card) -> None:
+        assert c.parent == self
+        self.cards += [c]
+    def configread(self, file : str) -> None:
+        fd  = open(file, 'r')
+        for line in fd:
+            words = line.strip().split(maxsplit = 2)
+            if words[0] == '/':
+                self.set(words[1], words[2])
+            else:
+                assert False
+        fd.close()
+    def tagid(self, obj : kv) -> None:
+        self.ids[obj.id()] = obj
+        for t in obj.get('tags', list, []):
+            self.tags[t] += [obj]
+        for l in obj.get('=', list, []):  # Links
+            link(self, obj, l)
+    def crossref(self) -> None:
+        self.ids  = collections.defaultdict(str)
+        self.tags = collections.defaultdict(list)
+        for c in self.cards:
+            self.tagid(c)
+            for f in c.frags:
+                self.tagid(f)
+    def build(self) -> None:
+        engine = engines[self.get('engine', str, 'html')]()
+        engine.run(self)
+    def tostring(self) -> List[str]:
+        return self.astring() + ['<'] + self.indent(8, sum([c.tostring() for c in self.cards], [])) + ['>']
+
+class span:
+    def __init__(self, obj : kv, regex : str):
+        self.obj = obj
+        self.regex = regex
+
+class link:
+    def __init__(self, d : deck, obj : kv, s : str):
+        self.deck = d
+        self.obj = obj
+        self.s = s
+        self.parse()
+    def src(self):
+        return self.src
+    def tgt(self):
+        return self.tgt
+    def parse(self) -> None:
+        parts = self.s.split('->', 1)
+        self.src = self.locator_add(parts[0], '+link src')
+        self.tgt = self.locator_add(parts[1], '+link dst')
+    def locator_add(self, loc : str, attr : str):
+        host = None
+        obj = self.obj
+        loc = loc.strip()
+        while len(loc) > 0:
+            if loc[0] == '.':   # Current object
+                loc = loc[1:]
+            elif loc[0] == '"': # Span
+                parts = loc[1:].split('"', 1)
+                host = obj
+                obj = span(obj, parts[0])
+                loc = parts[1]
+            elif loc[0] == '!': # Identifier.
+                parts = loc[1:].split(' ', 1)
+                obj = self.deck.ids[parts[0]]
+                loc = parts[1]
+            loc = loc.strip()
+        (obj if host == None else host).set(attr, self)
+            
+class eng:
+    pass
+
+class html_eng(eng):
+    def __init__(self):
+        self.series = {}
+        self.html_template = ('<html>\n'                    +
+                              ' <head>\n'                   +
+                              '   <title>{title}</title>\n' +
+                              ' </head>\n'                  +
+                              ' <body>{body}</body>\n'      +
+                              '</html>\n')
+        self.frag_template = '<p>{content}</p>'
+        self.para_template = '<p>{content}</p>'
+        self.code_template = '<code><pre>{content}</pre></code>'
+        self.math_template = '<math>{content}</math>'
+    def run(self, d : deck) -> None:
+        self.deck = d
+        self.prep()
+        self.frontmatter()
+        for c in self.deck.cards:
+            self.card_build(c)
+        self.backmatter()
+        self.index()
+        for s in self.series:
+            self.series_build(s)
+        self.done()
+    def prep(self) -> None:
+        dir = self.deck.get('dir', str, 'html_out')
+        os.mkdir(dir)
+        os.chdir(dir)
+    def done(self) -> None:
+        os.chdir('..')
+    def frontmatter(self) -> None:
+        pass
+    def backmatter(self) -> None:
+        pass
+    def card_build(self, c : card) -> None:
+        html_file = c.id() + '.html'
+        title     = html.escape(c.get('name', str, c.get('label', str, 'Card {}'.format(c.id()))))
+        frags     = '\n'.join([self.frag_render(f) for f in c.frags])
+        with open(html_file, 'w') as file:
+            file.write(self.html_template.format(**{ 'title' : title,
+                                                     'body'  : frags }))
+    def index(self) -> None:
+        pass
+    def index(self) -> None:
+        pass
+    def series_build(self, s):
+        pass
+    def frag_render(self, f : frag) -> str:
+        arg = { 'content' : html.escape(f.content()) }
+        if isinstance(f, para):
+            template = self.para_template
+        elif isinstance(f, code):
+            template = self.code_template
+        elif isinstance(f, math):
+            template = self.math_template
+        else:
+            template = self.frag_template
+        return template.format(**arg)
+        
+engines = {
+    'html' : html_eng
+}
+    
+def cardread(rolodex : deck, file : str) -> None:
+    seq = 0
+    fd  = open(file, 'r')
+    c   = card.fromfile(rolodex, file, fd, seq)
+    f   = None
+    for rawline in fd:
+        line = rawline.strip()
+        words = line.split(maxsplit=2)
+        if len(line) == 0:
+            c.frag_add(f)
+            f = None
+        elif words[0] == '//':  # Card attribute
+            c.set(words[1], words[2])
+        elif words[0] == '/':   # Fragment attribute
+            assert f != None
+            f.set(words[1], words[2])
+        elif words[0] == ';':   # Fragment type
+            c.frag_add(f)
+            f = frag_types[words[1]](c)
+        elif words[0] == '\\':  # New card
+            c.frag_add(f)
+            rolodex.add(c);
+            seq = seq + 1
+            c = card.fromfile(rolodex, file, fd, seq)
+            f = None
+        else:
+            if f == None:
+                f = para(c)
+            f.add(rawline)
+    c.frag_add(f)
+    rolodex.add(c);
+    fd.close()
+
+def main():
+    parser = argparse.ArgumentParser(description='Card reader.')
+    parser.add_argument('-c', '--config', type=str, default='card.conf', help='Config file.')
+    parser.add_argument('-v', '--verbose', action='store_true', help='Enable verbose mode.')
+    parser.add_argument('files', nargs=argparse.REMAINDER, help='Card files to be processed.')
+    args = parser.parse_args()
+
+    rolodex = deck()
+    rolodex.configread(args.config)
+    for file in args.files:
+        cardread(rolodex, file)
+    rolodex.crossref()
+    rolodex.build()
+    print(rolodex)
+        
+if __name__ == '__main__':
+    main()
+
+#  Local variables:
+#  python-indent-offset: 4
+#  End:

@@ -1,0 +1,60 @@
+// label CARD0 label
+card0: a
+card0: b
+card0: c
+card0: d
+
+    card0: next paragraph
+
+    card0: another paragraph
+; code
+/ language Algol-68
+x := x + 1
+// +tags TAG0
+// +tags TAG1
+
+
+\
+
+
+// label CARD1
+card1: 1
+card1: 2
+card1: 3
+card1: 4
+<> != "ddd"
+/ +tags TAG1
+
+Next paragraph
+/ +footnote footnote 1
+/ +footnote footnote 2
+/ anchor 1: 1
+// +tags TAG1
+
+\
+
+
+// label CARD2
+; math
+$\tau = 0$
+
+; code
+/ language pdp11-asm
+        MOV R0, R2
+COMPAR: CMP R1, R2
+        BEQ DONE
+        MOV (R2)+, R3
+        CMP(R2), R3
+        BPL COMPAR
+SWAP:   MOV (R2), R4
+        MOV R3, (R2)
+        MOV R4, -(R2)
+        SUB #2, R2
+        CMP R2, R0
+        BPL COMPAR
+        ADD #4, R2
+        BR COMPAR
+/ += . -> .
+// +tags TAG0
+// +tags TAG1
+
