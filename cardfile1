@@ -13,7 +13,7 @@ card0: d
 x := x + 1
 // +tags TAG0
 // +tags TAG1
-
+// +html.style body { color: green; font-size: 18px; }
 
 \
 
@@ -25,6 +25,8 @@ card1: 3
 card1: 4
 <> != "ddd"
 / +tags TAG1
+/ += . ": 2" -> !card0
+/ += . -> !card0
 
 Next paragraph
 / +footnote footnote 1
@@ -56,6 +58,8 @@ SWAP:   MOV (R2), R4
         ADD #4, R2
         BR COMPAR
 / += . -> .
+/ += . -> !card0
+/ += . -> !card0-00003
 // +tags TAG0
 // +tags TAG1
 / +html.style color: red; font-size: 18px;

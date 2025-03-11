@@ -21,6 +21,7 @@ import os
 import datetime
 import collections
 import html
+import re
 from typing import List, Dict, Optional, Tuple
 from typeguard import typechecked # Must be installed.
 
@@ -50,12 +51,14 @@ class kv:
         return ttype(self.attrs.get(key)) if self.has(key) else default
     def has(self, key : str) -> bool:
         return key in self.attrs
-    def makeseq(self, base : str) -> str:
+    def makeseq(self, base : str) -> str: # Need 'int'!
         return (base + '-' + '{:05}'.format(self.get('seq', int, None))).replace(' ', '-')
-    def indent(self, n : int, lines : List[str]) -> List[str]:
+    def indent(self, n : int, lines) -> List[str]:
         return [n * ' ' + x.rstrip('\n') for x in lines]
+    def dictstring(self, d) -> List[str]:
+        return ['{} : {}'.format(key, d[key]) for key in d]
     def astring(self) -> List[str]:
-        return ['{} : {}'.format(key, self.attrs[key]) for key in self.attrs]
+        return self.dictstring(self.attrs)
     def tostring(self) -> List[str]:
         return self.astring()
     def __str__(self) -> str:
@@ -123,6 +126,8 @@ class deck(kv):
     def __init__(self):
         kv.__init__(self, None)
         self.cards = []
+        self.ids   = {}
+        self.tags  = collections.defaultdict(list)
     def add(self, c : card) -> None:
         assert c.parent == self
         self.cards += [c]
@@ -143,8 +148,6 @@ class deck(kv):
         for l in obj.get('=', list, []):  # Links.
             link(self, obj, l)
     def crossref(self) -> None:
-        self.ids  = collections.defaultdict(str)
-        self.tags = collections.defaultdict(list)
         for c in self.cards:
             self.tagid(c)
             for f in c.frags:
@@ -153,13 +156,25 @@ class deck(kv):
         engine = engines[self.get('engine', str, 'html')]()
         engine.run(self)
     def tostring(self) -> List[str]:
-        return self.astring() + ['<'] + self.indent(8, sum([c.tostring() for c in self.cards], [])) + ['>']
+        return [''] + \
+            ['<dock'] + \
+            self.astring() + \
+            ['--ids----'] + \
+            self.indent(8, self.ids.keys()) + \
+            ['--tags---'] + \
+            self.indent(8, self.tags.keys()) + \
+            ['--cards--'] + \
+            self.indent(8, sum([c.tostring() + ['********'] for c in self.cards], [])) + \
+            ['>']
 
 @typechecked
 class span:
     def __init__(self, obj : kv, regex : str):
         self.obj = obj
         self.regex = regex
+
+link_src = 'link src'
+link_tgt = 'link tgt'
 
 @typechecked
 class link:
@@ -174,8 +189,8 @@ class link:
         return self.tgt
     def parse(self) -> None:
         parts = self.s.split('->', 1)
-        self.src = self.locator_add(parts[0], '+link src')
-        self.tgt = self.locator_add(parts[1], '+link dst')
+        self.src = self.locator_add(parts[0], '+' + link_src)
+        self.tgt = self.locator_add(parts[1], '+' + link_tgt)
     def locator_add(self, loc : str, attr : str):
         host = None
         obj = self.obj
@@ -191,13 +206,22 @@ class link:
             elif loc[0] == '!': # Identifier.
                 parts = loc[1:].split(' ', 1)
                 obj = self.deck.ids[parts[0]]
-                loc = parts[1]
+                loc = parts[1] if len(parts) > 1 else ''
+            else:
+                assert False
             loc = loc.strip()
         (obj if host == None else host).set(attr, self)
+        return obj
             
 @typechecked
 class eng:
     pass
+
+html_file       = 'html.file'
+html_anchor     = 'html.anchor'
+html_content    = 'html.content'
+html_style      = 'html.style'
+html_style_file = 'html.style.file'
 
 @typechecked
 class html_eng(eng):
@@ -210,16 +234,19 @@ class html_eng(eng):
             '   <meta charset="UTF-8">\n'                     +
             '   <title>{title}</title>\n'                     +
             '   <link rel="stylesheet" href="{stylefile}">\n' +
+            '   <style>{style}</style>\n'                     +
             ' </head>\n'                                      +
             ' <body>\n'                                       +
-            '   <a name={id}>{body}\n'                        +
+            '   <a name="{anchor}">{body}\n'                  +
             ' </body>\n'                                      +
             '</html>\n')
-        self.anchor_template = '<a name="{id}">'
-        self.frag_template = '<p style="{style}">{content}</p>'
-        self.para_template = '<p style="{style}">{content}</p>'
-        self.code_template = '<code style="{style}"><pre>{content}</pre></code>'
-        self.math_template = '<math style="{style}">{content}</math>'
+        self.anchor_template = '<a name="{anchor}">'
+        self.frag_templates = {
+            para : '<p style="{style}">{content}</p>',
+            code : '<code style="{style}"><pre>{content}</pre></code>',
+            math : '<math style="{style}">{content}</math>'
+        }
+        self.frag_default_template = '<p style="{style}">{content}</p>'
     def tag(self, tag : str, value : str) -> str:
         return '<{}>\{{{value}}}</{}>'.format(tag, value, tag)
     def run(self, d : deck) -> None:
@@ -245,40 +272,70 @@ class html_eng(eng):
     def backmatter(self) -> None:
         pass
     def card_build(self, c : card) -> None:
-        html_file = c.id() + '.html'
-        title     = html.escape(c.get('name', str, c.get('label', str, 'Card {}'.format(c.id()))))
-        frags     = '\n'.join([self.frag_render(f) for f in c.frags])
-        self.out(html_file, self.html_template.format(**{ 'title'     : title,
-                                                          'body'      : frags,
-                                                          'stylefile' : self.stylefile,
-                                                          'id'        : html.escape(c.id())}))
+        file   = c.get(html_file, str, c.id() + '.html')
+        anchor = html.escape(c.get(html_anchor, str, c.id()))
+        title  = html.escape(c.get('name', str, c.get('label', str, 'Card {}'.format(c.id()))))
+        frags  = '\n'.join([self.frag_render(f) for f in c.frags])
+        self.out(file, self.html_template.format(**{ 'title'     : title,
+                                                     'body'      : frags,
+                                                     'stylefile' : self.style_file,
+                                                     'style'     : self.style_text(c),
+                                                     'anchor'    : anchor }))
+        c.set(html_file,   file)
+        c.set(html_anchor, anchor)
     def index(self) -> None:
         pass
     def series_build(self, s):
         pass
-    def escape(self, d : dict[str, str]) -> dict[str, str]:
-        return { key : html.escape(d[key]) for key in d }
     def frag_render(self, f : frag) -> str:
-        arg = { 'content' : f.content(), 'id' : f.id(), 'style' : self.style_text(f) }
-        if isinstance(f, para):
-            template = self.para_template
-        elif isinstance(f, code):
-            template = self.code_template
-        elif isinstance(f, math):
-            template = self.math_template
-        else:
-            template = self.frag_template
-        return (self.anchor_template + template).format(**self.escape(arg))
+        anchor = html.escape(f.get(html_anchor, str, f.id()))
+        content = self.frag_links(f)
+        arg = { 'content' : content,
+                'anchor'  : anchor,
+                'style'   : self.style_text(f) }
+        template = self.frag_templates.get(type(f), self.frag_default_template)
+        f.set(html_anchor, anchor)
+        f.set(html_content, content)
+        return (self.anchor_template + template).format(**arg)
     def out(self, f, content):
         with open(f, 'w') as fd:
             fd.write(content)
     def style_text(self, obj):
-        return '\n'.join(obj.get('html.style', list, []))
+        return '\n'.join(obj.get(html_style, list, []))
     def style_build(self):
-        self.stylefile = self.deck.get('html.style.file', str, 'style.css')
-        self.out(self.stylefile, self.style_text(self.deck) + '\n')
-        
-        
+        self.style_file = self.deck.get(html_style_file, str, 'style.css')
+        self.out(self.style_file, self.style_text(self.deck) + '\n')
+    def href(self, src, tgt):
+        h = '#' + tgt.get(http_anchor)
+        file = tgt.get(http_file)
+        if file != src.get(http_file):
+            h = file + h
+        return h
+    def frag_links(self, f):
+        parts = [(True, f.content())]
+        extra = '\n'
+        for l in f.get(link_src, list, []):
+            if (type(l.src) == span):
+                regex = re.compile(l.src.regex)
+                pnew = []
+                for ff in parts:
+                    if not ff[0]:
+                        pnew += [ff]
+                    else:
+                        s = ff[1]
+                        for m in re.finditer(regex, s):
+                            pnew += [(True,  s[0 : m.start()]),
+                                     (False, '<a href="dasdjalsjd">'),
+                                     (True,  s[m.start() : m.end()]),
+                                     (False, '</a>'),
+                                     (True,  s[m.end() : ])]
+                        pnew += [(True, s)]
+                parts = pnew
+            else:
+                assert l.src == f
+                extra += '<p><a href="dsadaas">link</a></p>\n'
+        return ''.join([html.escape(p[1]) if p[0] else p[1] for p in parts]) + extra
+
 engines = {
     'html' : html_eng
 }
@@ -330,7 +387,8 @@ def main():
         cardread(rolodex, file)
     rolodex.crossref()
     rolodex.build()
-    print(rolodex)
+    if args.verbose:
+        print(rolodex)
         
 if __name__ == '__main__':
     main()
