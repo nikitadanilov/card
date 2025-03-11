@@ -136,10 +136,11 @@ class deck(kv):
                 assert False
         fd.close()
     def tagid(self, obj : kv) -> None:
+        assert obj.id() not in self.ids   # Identifier must be unique.
         self.ids[obj.id()] = obj
         for t in obj.get('tags', list, []):
             self.tags[t] += [obj]
-        for l in obj.get('=', list, []):  # Links
+        for l in obj.get('=', list, []):  # Links.
             link(self, obj, l)
     def crossref(self) -> None:
         self.ids  = collections.defaultdict(str)
@@ -206,12 +207,17 @@ class html_eng(eng):
                               ' <head>\n'                   +
                               '   <title>{title}</title>\n' +
                               ' </head>\n'                  +
-                              ' <body>{body}</body>\n'      +
+                              ' <body>\n'                   +
+                              '   <a name={id}>{body}\n'    +
+                              ' </body>\n'                  +
                               '</html>\n')
+        self.anchor_template = '<a name="{id}">'
         self.frag_template = '<p>{content}</p>'
         self.para_template = '<p>{content}</p>'
         self.code_template = '<code><pre>{content}</pre></code>'
         self.math_template = '<math>{content}</math>'
+    def tag(self, tag : str, value : str) -> str:
+        return '<{}>\{{{value}}}</{}>'.format(tag, value, tag)
     def run(self, d : deck) -> None:
         self.deck = d
         self.prep()
@@ -239,15 +245,18 @@ class html_eng(eng):
         frags     = '\n'.join([self.frag_render(f) for f in c.frags])
         with open(html_file, 'w') as file:
             file.write(self.html_template.format(**{ 'title' : title,
-                                                     'body'  : frags }))
+                                                     'body'  : frags,
+                                                     'id'    : html.escape(c.id())}))
     def index(self) -> None:
         pass
     def index(self) -> None:
         pass
     def series_build(self, s):
         pass
+    def escape(self, d : dict[str, str]) -> dict[str, str]:
+        return { key : html.escape(d[key]) for key in d }
     def frag_render(self, f : frag) -> str:
-        arg = { 'content' : html.escape(f.content()) }
+        arg = { 'content' : f.content(), 'id' : f.id() }
         if isinstance(f, para):
             template = self.para_template
         elif isinstance(f, code):
@@ -256,7 +265,7 @@ class html_eng(eng):
             template = self.math_template
         else:
             template = self.frag_template
-        return template.format(**arg)
+        return (self.anchor_template + template).format(**self.escape(arg))
         
 engines = {
     'html' : html_eng
