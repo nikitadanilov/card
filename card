@@ -203,19 +203,23 @@ class eng:
 class html_eng(eng):
     def __init__(self):
         self.series = {}
-        self.html_template = ('<html>\n'                    +
-                              ' <head>\n'                   +
-                              '   <title>{title}</title>\n' +
-                              ' </head>\n'                  +
-                              ' <body>\n'                   +
-                              '   <a name={id}>{body}\n'    +
-                              ' </body>\n'                  +
-                              '</html>\n')
+        self.html_template = (
+            '<!DOCTYPE html>\n'                               + 
+            '<html>\n'                                        +
+            ' <head>\n'                                       +
+            '   <meta charset="UTF-8">\n'                     +
+            '   <title>{title}</title>\n'                     +
+            '   <link rel="stylesheet" href="{stylefile}">\n' +
+            ' </head>\n'                                      +
+            ' <body>\n'                                       +
+            '   <a name={id}>{body}\n'                        +
+            ' </body>\n'                                      +
+            '</html>\n')
         self.anchor_template = '<a name="{id}">'
-        self.frag_template = '<p>{content}</p>'
-        self.para_template = '<p>{content}</p>'
-        self.code_template = '<code><pre>{content}</pre></code>'
-        self.math_template = '<math>{content}</math>'
+        self.frag_template = '<p style="{style}">{content}</p>'
+        self.para_template = '<p style="{style}">{content}</p>'
+        self.code_template = '<code style="{style}"><pre>{content}</pre></code>'
+        self.math_template = '<math style="{style}">{content}</math>'
     def tag(self, tag : str, value : str) -> str:
         return '<{}>\{{{value}}}</{}>'.format(tag, value, tag)
     def run(self, d : deck) -> None:
@@ -233,6 +237,7 @@ class html_eng(eng):
         dir = self.deck.get('dir', str, 'html_out')
         os.mkdir(dir)
         os.chdir(dir)
+        self.style_build()
     def done(self) -> None:
         os.chdir('..')
     def frontmatter(self) -> None:
@@ -243,12 +248,10 @@ class html_eng(eng):
         html_file = c.id() + '.html'
         title     = html.escape(c.get('name', str, c.get('label', str, 'Card {}'.format(c.id()))))
         frags     = '\n'.join([self.frag_render(f) for f in c.frags])
-        with open(html_file, 'w') as file:
-            file.write(self.html_template.format(**{ 'title' : title,
-                                                     'body'  : frags,
-                                                     'id'    : html.escape(c.id())}))
-    def index(self) -> None:
-        pass
+        self.out(html_file, self.html_template.format(**{ 'title'     : title,
+                                                          'body'      : frags,
+                                                          'stylefile' : self.stylefile,
+                                                          'id'        : html.escape(c.id())}))
     def index(self) -> None:
         pass
     def series_build(self, s):
@@ -256,7 +259,7 @@ class html_eng(eng):
     def escape(self, d : dict[str, str]) -> dict[str, str]:
         return { key : html.escape(d[key]) for key in d }
     def frag_render(self, f : frag) -> str:
-        arg = { 'content' : f.content(), 'id' : f.id() }
+        arg = { 'content' : f.content(), 'id' : f.id(), 'style' : self.style_text(f) }
         if isinstance(f, para):
             template = self.para_template
         elif isinstance(f, code):
@@ -266,6 +269,15 @@ class html_eng(eng):
         else:
             template = self.frag_template
         return (self.anchor_template + template).format(**self.escape(arg))
+    def out(self, f, content):
+        with open(f, 'w') as fd:
+            fd.write(content)
+    def style_text(self, obj):
+        return '\n'.join(obj.get('html.style', list, []))
+    def style_build(self):
+        self.stylefile = self.deck.get('html.style.file', str, 'style.css')
+        self.out(self.stylefile, self.style_text(self.deck) + '\n')
+        
         
 engines = {
     'html' : html_eng
