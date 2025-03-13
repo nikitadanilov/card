@@ -20,13 +20,14 @@ x := x + 1
 
 // label CARD1
 card1: 1
-card1: 2
-card1: 3
-card1: 4
+card2: 2
+card3: 3
+card4: 4
 <> != "ddd"
 / +tags TAG1
 / += . ": 2" -> !card0
-/ += . -> !card0
+/ += . ": 3" -> http://www.example.com
+/ += http://www.example.com -> !card0 "card0: b"
 
 Next paragraph
 / +footnote footnote 1

@@ -26,16 +26,18 @@ from typing import List, Dict, Optional, Tuple
 from typeguard import typechecked # Must be installed.
 
 @typechecked
-class kv:
+class node:
     """Base class for deck, card and fragment.
 
-    kv knows has a parent kv, a dictionary of attributes and can pretty-print
+    node knows has a parent node, a dictionary of attributes and can pretty-print
     itself.
 
     """
-    def __init__(self, parent : Optional[kv]):
-        self.attrs  = {}
+    def __init__(self, parent : Optional[node]):
         self.parent = parent
+        self.attrs  = {}
+        self.incmd  = []
+        self.excmd  = []
     def set(self, key : str, value) -> None:
         """Sets the attribute. If attribute name starts with '+', then the value
         is added to the list.
@@ -43,14 +45,28 @@ class kv:
         """
         assert len(key) > 0
         if key[0] == '+':
-            key = key[1:]
-            self.attrs[key] = self.attrs.get(key, []) + [value]
+            self.add(key[1:], value)
         else:
             self.attrs[key] = value
+    def add(self, key : str, value) -> None:
+        self.attrs[key] = self.attrs.get(key, []) + [value]
     def get(self, key, ttype : type = str, default = None):
         return ttype(self.attrs.get(key)) if self.has(key) else default
     def has(self, key : str) -> bool:
         return key in self.attrs
+    def pair(self, incmd : cmd, excmd : cmd):
+        incmd.node = self
+        excmd.node = self
+        self.incmd = [incmd] + self.incmd
+        self.excmd = self.excmd + [excmd]
+    def into(self, incmd : cmd, excmd : cmd):
+        incmd.node = self
+        excmd.node = self
+        self.incmd = self.incmd + [incmd]
+        self.excmd = [excmd] + self.excmd
+    def cadd(self, incmd : cmd):
+        incmd.node = self
+        self.incmd += [incmd]
     def makeseq(self, base : str) -> str: # Need 'int'!
         return (base + '-' + '{:05}'.format(self.get('seq', int, None))).replace(' ', '-')
     def indent(self, n : int, lines) -> List[str]:
@@ -60,23 +76,40 @@ class kv:
     def astring(self) -> List[str]:
         return self.dictstring(self.attrs)
     def tostring(self) -> List[str]:
-        return self.astring()
+        return self.astring() + \
+            ['-incmds--'] + self.indent(8, [x.__str__() for x in self.incmd]) + \
+            ['-excmds--'] + self.indent(8, [x.__str__() for x in self.excmd])
     def __str__(self) -> str:
         return '\n'.join(self.tostring())
+    def __repr__(self) -> str:
+        return self.__str__()
     
 @typechecked
-class frag(kv):
+class frag(node):
     def __init__(self, c : card):
-        kv.__init__(self, c)
+        node.__init__(self, c)
         self.lines = []
-    def add(self, line : str):
+    def line_add(self, line : str):
         self.lines += [line]
     def content(self) -> str:
         return ''.join(self.lines).strip()
     def id(self) -> str:
         return self.makeseq(self.parent.id())
+    def cut(self):
+        text = self.content()
+        last = 0
+        markers = self.attrs.get(':markers', [])
+        for idx in sorted(markers):
+            if idx > 0:
+                self.cadd(cmd(TEXT, text[last : idx]))
+            for c in markers[idx]:
+                self.cadd(c)
+            last = idx
+        self.cadd(cmd(TEXT, text[last:]))
+    def program(self):
+        return self.incmd + self.excmd
     def tostring(self) -> List[str]:
-        return self.astring() + ['{'] + self.indent(8, self.lines) + ['}']
+        return super().tostring() + ['{'] + self.indent(8, self.lines) + ['}']
 
 @typechecked
 class para(frag):
@@ -98,9 +131,9 @@ frag_types = {
 }
 
 @typechecked
-class card(kv):
+class card(node):
     def __init__(self, d : deck):
-        kv.__init__(self, d)
+        node.__init__(self, d)
         self.frags = []
     def frag_add(self, f : Optional[frag]) -> None:
         if f != None:
@@ -118,17 +151,19 @@ class card(kv):
         c.set('mtime', datetime.datetime.fromtimestamp(stats.st_mtime))
         c.set('ctime', datetime.datetime.fromtimestamp(stats.st_ctime))
         return c
+    def program(self):
+        return self.incmd + sum([f.program() for f in self.frags], []) + self.excmd
     def tostring(self) -> List[str]:
-        return self.astring() + ['['] + self.indent(8, sum([f.tostring() for f in self.frags], [])) + [']']
+        return super().tostring() + ['['] + self.indent(8, sum([f.tostring() for f in self.frags], [])) + [']']
 
 @typechecked
-class deck(kv):
+class deck(node):
     def __init__(self):
-        kv.__init__(self, None)
+        node.__init__(self, None)
         self.cards = []
         self.ids   = {}
         self.tags  = collections.defaultdict(list)
-    def add(self, c : card) -> None:
+    def card_add(self, c : card) -> None:
         assert c.parent == self
         self.cards += [c]
     def configread(self, file : str) -> None:
@@ -140,25 +175,55 @@ class deck(kv):
             else:
                 assert False
         fd.close()
-    def tagid(self, obj : kv) -> None:
+    def tagid(self, obj : node) -> None:
         assert obj.id() not in self.ids   # Identifier must be unique.
         self.ids[obj.id()] = obj
         for t in obj.get('tags', list, []):
             self.tags[t] += [obj]
-        for l in obj.get('=', list, []):  # Links.
-            link(self, obj, l)
+    def makelinks(self, n : node):
+        for l in n.get('=', list, []):
+            link(self, n, l)
+    def addlinks(self, n : node):
+        for place in n.get(':links', list, []):
+            assert place.parent != None
+            n.cadd(cmd(place.parent.base(n) + L_HERE, place.parent))
     def crossref(self) -> None:
+        frag_cmds = {
+            para : (PARA_BEGIN, PARA_END),
+            math : (MATH_BEGIN, MATH_END),
+            code : (CODE_BEGIN, CODE_END)
+        }
+        # Pass 0: build identifiers index, it is needed to resolve link names, etc. later.
         for c in self.cards:
             self.tagid(c)
             for f in c.frags:
                 self.tagid(f)
+        # Pass 1: build links
+        for c in self.cards:
+            self.makelinks(c)
+            for f in c.frags:
+                self.makelinks(f)
+        # Pass 1: build command tree
+        for c in self.cards:
+            self.addlinks(c)
+            for f in c.frags:
+                self.addlinks(f)
+                cmds = frag_cmds.get(type(f), (FRAG_BEGIN, FRAG_END))
+                f.into(cmd(cmds[0]), cmd(cmds[1]))
+                for s in f.get(':spans', list, []) + c.get(':spans', list, []) + self.get(':spans', list, []):
+                    s.resolve()
+                f.cut()
+            c.pair(cmd(CARD_BEGIN), cmd(CARD_END))
+        self.pair(cmd(BEGIN), cmd(END))
+    def program(self):
+        return self.incmd + sum([c.program() for c in self.cards], []) + self.excmd
     def build(self) -> None:
-        engine = engines[self.get('engine', str, 'html')]()
-        engine.run(self)
+        # print('\n'.join([str(x) for x in self.program()]))
+        engines[self.get('engine', str, 'html')]().run(self, self.program())
     def tostring(self) -> List[str]:
         return [''] + \
             ['<dock'] + \
-            self.astring() + \
+            super().tostring() + \
             ['--ids----'] + \
             self.indent(8, self.ids.keys()) + \
             ['--tags---'] + \
@@ -168,51 +233,113 @@ class deck(kv):
             ['>']
 
 @typechecked
-class span:
-    def __init__(self, obj : kv, regex : str):
-        self.obj = obj
-        self.regex = regex
+class place:
+    pass
 
-link_src = 'link src'
-link_tgt = 'link tgt'
+@typechecked
+class url_place(place):
+    def __init__(self, parent : link, url : str):
+        self.url  = url
+        self.node = None
+        self.parent = parent
+    def __str__(self) -> str:
+        return 'url: ' + self.url
+
+@typechecked
+class node_place(place):
+    def __init__(self, parent : link, obj : node):
+        self.node = obj
+        self.parent = parent
+    def __str__(self) -> str:
+        return 'node: ' + self.node.id()
+
+@typechecked
+class span(place):
+    def __init__(self, parent : link, obj : node, pattern : str, base : int):
+        self.node    = obj
+        self.parent  = parent
+        self.pattern = pattern
+        self.base    = base
+        self.regex   = re.compile(pattern)
+    def resolve(self) -> None:
+        assert isinstance(self.node, card) or isinstance(self.node, frag)
+        if isinstance(self.node, card):
+            assert self.parent != None
+            self.node.cadd(cmd(self.base + L_HERE, self.parent))
+            return
+        text = self.node.content()
+        if not self.node.get(':markers'):
+            self.node.set(':markers', collections.defaultdict(list))
+        markers = self.node.attrs[':markers']
+        for m in re.finditer(self.regex, text):
+            # Check that there is no overlap
+            assert any([i not in markers for i in range(m.start(), m.end())])
+            markers[m.start()] = markers[m.start()] + [cmd(self.base + L_START, self.parent)]
+            markers[m.end()]   = [cmd(self.base + L_END, self.parent)] + markers[m.end()]
+        self.node.set(':markers', markers)
+    def __str__(self) -> str:
+        return 'span: ' + self.node.id() + ' "' + self.pattern + '"'
+    def __repr__(self) -> str:
+        return self.__str__()
 
 @typechecked
 class link:
-    def __init__(self, d : deck, obj : kv, s : str):
+    """Hyperlink.
+
+    A link connects two places: the source to the target. A place can be: a node
+    (card or fragment), a span within a node (defined via regular expression, or
+    line number, or...) or a URL.
+
+    Link attribute ('=') grammar:
+
+        LINK  ::= SRC '->' TGT
+        SRC   ::= PLACE
+        TGT   ::= PLACE
+        PLACE ::= URL | NODE [SPAN]
+        URL   ::= ...
+        NODE  ::= '.' | '!' IDENTIFIER
+        SPAN  ::= '"' REGEX '"'
+    """
+    def __init__(self, d : deck, obj : node, s : str):
         self.deck = d
         self.obj = obj
         self.s = s
         self.parse()
-    def src(self):
-        return self.src
-    def tgt(self):
-        return self.tgt
     def parse(self) -> None:
         parts = self.s.split('->', 1)
-        self.src = self.locator_add(parts[0], '+' + link_src)
-        self.tgt = self.locator_add(parts[1], '+' + link_tgt)
-    def locator_add(self, loc : str, attr : str):
-        host = None
-        obj = self.obj
-        loc = loc.strip()
-        while len(loc) > 0:
-            if loc[0] == '.':   # Current object
-                loc = loc[1:]
-            elif loc[0] == '"': # Span
-                parts = loc[1:].split('"', 1)
-                host = obj
-                obj = span(obj, parts[0])
-                loc = parts[1]
-            elif loc[0] == '!': # Identifier.
-                parts = loc[1:].split(' ', 1)
-                obj = self.deck.ids[parts[0]]
-                loc = parts[1] if len(parts) > 1 else ''
-            else:
-                assert False
-            loc = loc.strip()
-        (obj if host == None else host).set(attr, self)
-        return obj
-            
+        self.src = self.place(parts[0].strip(), LSRC_BASE)
+        self.tgt = self.place(parts[1].strip(), LTGT_BASE)
+    def place(self, s : str, base : int) -> place:
+        assert len(s) > 0
+        rest = s[1:].strip()
+        if   s[0] == '.':
+            obj = self.obj
+        elif s[0] == '!':
+            parts = rest.split(' ', 1)
+            obj   = self.deck.ids[parts[0]]
+            rest  = parts[1] if len(parts) > 1 else ''
+        else:
+            return url_place(self, s)
+        rest = rest.strip()
+        if rest != '':
+            assert rest[ 0] == '"'
+            assert rest[-1] == '"'
+            parts = rest[1:].split('"', 1)
+            splace = span(self, obj, rest[1:-1], base)
+            obj.add(':spans', splace)
+            return splace
+        else:
+            nplace = node_place(self, obj)
+            obj.add(':links', nplace)
+            return node_place(self, obj)
+    def base(self, n : node) -> int:
+        assert n == self.src.node or n == self.tgt.node
+        return LSRC_BASE if n == self.src.node else LTGT_BASE
+    def __str__(self) -> str:
+        return self.src.__str__() + ' -> ' + self.tgt.__str__()
+    def __repr__(self) -> str:
+        return self.__str__()
+    
 @typechecked
 class eng:
     pass
@@ -227,7 +354,7 @@ html_style_file = 'html.style.file'
 class html_eng(eng):
     def __init__(self):
         self.series = {}
-        self.html_template = (
+        self.html_card_begin = (
             '<!DOCTYPE html>\n'                               + 
             '<html>\n'                                        +
             ' <head>\n'                                       +
@@ -237,109 +364,237 @@ class html_eng(eng):
             '   <style>{style}</style>\n'                     +
             ' </head>\n'                                      +
             ' <body>\n'                                       +
-            '   <a name="{anchor}">{body}\n'                  +
+            '   <a name="{anchor}">');
+        self.html_card_end = (
             ' </body>\n'                                      +
             '</html>\n')
-        self.anchor_template = '<a name="{anchor}">'
-        self.frag_templates = {
-            para : '<p style="{style}">{content}</p>',
-            code : '<code style="{style}"><pre>{content}</pre></code>',
-            math : '<math style="{style}">{content}</math>'
+        self.html_anchor     = '<a name="{anchor}">'
+        self.html_frag_pair = {
+            para : ('<p{attrs}>',         '</p>'),
+            code : ('<code{attrs}><pre>', '</pre></code>'),
+            math : ('<math{attrs}>',      '</math>')
         }
-        self.frag_default_template = '<p style="{style}">{content}</p>'
-    def tag(self, tag : str, value : str) -> str:
-        return '<{}>\{{{value}}}</{}>'.format(tag, value, tag)
-    def run(self, d : deck) -> None:
+        self.html_href_pair = ('<a href="{ref}">', '</a>')
+        self.commands = {
+            CARD_BEGIN  : html_eng.card_begin,
+            CARD_END    : html_eng.card_end,
+            FRAG_BEGIN  : html_eng.frag_begin,
+            FRAG_END    : html_eng.frag_end,
+            PARA_BEGIN  : html_eng.para_begin,
+            PARA_END    : html_eng.para_end,
+            CODE_BEGIN  : html_eng.code_begin,
+            CODE_END    : html_eng.code_end,
+            MATH_BEGIN  : html_eng.math_begin,
+            MATH_END    : html_eng.math_end,
+            LSRC_HERE   : html_eng.lsrc_here,
+            LSRC_START  : html_eng.lsrc_start,
+            LSRC_END    : html_eng.lsrc_end,
+            LTGT_HERE   : html_eng.ltgt_here,
+            LTGT_START  : html_eng.ltgt_start,
+            LTGT_END    : html_eng.ltgt_end,
+            TEXT        : html_eng.text,
+            STYLE_BEGIN : html_eng.style_begin,
+            STYLE_END   : html_eng.style_end,
+            BEGIN       : html_eng.begin,
+            END         : html_eng.end
+        }
+    def run(self, d : deck, p : List[cmd]) -> None:
         self.deck = d
-        self.prep()
-        self.frontmatter()
-        for c in self.deck.cards:
-            self.card_build(c)
-        self.backmatter()
-        self.index()
-        for s in self.series:
-            self.series_build(s)
-        self.done()
-    def prep(self) -> None:
+        for c in p:
+            self.exec(c)
+    def exec(self, c : cmd):
+        self.commands[c.opc](self, c, c.node, c.obj)
+    def card_begin(self, c : cmd, n : card, o):
+        assert o == None
+        self.indent += 1
+        self.fd = open(n.get(html_file, str, None), 'w')
+        title = html.escape(n.get('name', str, n.get('label', str, 'Card {}'.format(n.id()))))
+        self.out(self.html_card_begin.format(**{ 'title'     : title,
+                                                 'stylefile' : self.style_file,
+                                                 'style'     : self.style_text(n),
+                                                 'anchor'    : n.get(html_anchor, str, None) }))
+    def card_end(self, c : cmd, n : card, o):
+        assert o == None
+        self.outnl(self.html_card_end)
+        self.fd.close()
+        self.indent -= 1
+    def frag_begin(self, c : cmd, n : frag, o):
+        assert o == None
+        anchor = html.escape(n.get(html_anchor, str, n.id()))
+        n.set(html_anchor, anchor)
+        self.indent += 1
+        attrs = self.formatif(' style="{}"', '', self.style_text(n))
+        self.outnl((self.html_anchor + \
+                    self.html_frag_pair[type(n)][0]).format(**{ 'anchor'  : anchor,
+                                                                'attrs'   : attrs }))
+    def frag_end(self, c : cmd, n : frag, o):
+        assert o == None
+        self.outnl(self.html_frag_pair[type(n)][1])
+        self.indent -= 1
+    def para_begin(self, c : cmd, n : para, o):
+        self.frag_begin(c, n, o)
+    def para_end(self, c : cmd, n : para, o):
+        self.frag_end(c, n, o)
+    def code_begin(self, c : cmd, n : code, o):
+        self.frag_begin(c, n, o)
+    def code_end(self, c : cmd, n : code, o):
+        self.frag_end(c, n, o)
+    def math_begin(self, c : cmd, n : math, o):
+        self.frag_begin(c, n, o)
+    def math_end(self, c : cmd, n : math, o):
+        self.frag_end(c, n, o)
+    def lsrc_here(self, c : cmd, n : node, o : link):
+        self.text(c, n, ' [')
+        self.href_start(n, o.tgt)
+        self.text(c, n, 'link')
+        self.href_end()
+        self.text(c, n, '] ')
+    def lsrc_start(self, c : cmd, n : node, o : link):
+        self.href_start(n, o.tgt)
+    def lsrc_end(self, c : cmd, n : node, o : link):
+        self.href_end()
+    def ltgt_here(self, c : cmd, n : node, o : link):
+        self.text(c, n, ' [')
+        self.href_start(n, o.src)
+        self.text(c, n, 'ref-by')
+        self.href_end()
+        self.text(c, n, '] ')
+    def ltgt_start(self, c : cmd, n : node, o : link):
+        pass
+    def ltgt_end(self, c : cmd, n : node, o : link):
+        pass
+    def text(self, c : cmd, n : node, o : str):
+        self.out(html.escape(o))
+    def style_begin(self, c : cmd, n : node, o : str):
+        pass
+    def style_end(self, c : cmd, n : node, o):
+        pass
+    def begin(self, c : cmd, n : node, o):
+        assert o == None
         dir = self.deck.get('dir', str, 'html_out')
         os.mkdir(dir)
         os.chdir(dir)
         self.style_build()
-    def done(self) -> None:
+        self.prep()
+        self.indent = 0
+    def end(self, c : cmd, n : node, o):
+        assert self.indent == 0
+        self.backmatter()
+        self.index()
+        for s in self.series:
+            self.series_build(s)
         os.chdir('..')
+    def prep(self): # Build all filenames and anchors.
+        for c in self.deck.cards:
+            file = c.get(html_file, str, c.id() + '.html')
+            c.set(html_file, file)
+            c.set(html_anchor, html.escape(c.get(html_anchor, str, c.id())))
+            for f in c.frags:
+                f.set(html_file, file)
+                f.set(html_anchor, html.escape(f.get(html_anchor, str, f.id())))
+        self.frontmatter()
+    def href_start(self, fr : node, p : place):
+        if isinstance(p, url_place):
+            ref = p.url
+        else:
+            assert isinstance(p, span) or isinstance(p, node_place)
+            ref = self.href(fr, p.node)
+        self.out(self.html_href_pair[0].format(**{ 'ref' : ref }))
+    def href_end(self):
+        self.out(self.html_href_pair[1])
+    def formatif(self, notempty : str, empty : str, s : str):
+        return empty if s == '' else notempty.format(s)
     def frontmatter(self) -> None:
         pass
     def backmatter(self) -> None:
         pass
-    def card_build(self, c : card) -> None:
-        file   = c.get(html_file, str, c.id() + '.html')
-        anchor = html.escape(c.get(html_anchor, str, c.id()))
-        title  = html.escape(c.get('name', str, c.get('label', str, 'Card {}'.format(c.id()))))
-        frags  = '\n'.join([self.frag_render(f) for f in c.frags])
-        self.out(file, self.html_template.format(**{ 'title'     : title,
-                                                     'body'      : frags,
-                                                     'stylefile' : self.style_file,
-                                                     'style'     : self.style_text(c),
-                                                     'anchor'    : anchor }))
-        c.set(html_file,   file)
-        c.set(html_anchor, anchor)
     def index(self) -> None:
         pass
     def series_build(self, s):
         pass
-    def frag_render(self, f : frag) -> str:
-        anchor = html.escape(f.get(html_anchor, str, f.id()))
-        content = self.frag_links(f)
-        arg = { 'content' : content,
-                'anchor'  : anchor,
-                'style'   : self.style_text(f) }
-        template = self.frag_templates.get(type(f), self.frag_default_template)
-        f.set(html_anchor, anchor)
-        f.set(html_content, content)
-        return (self.anchor_template + template).format(**arg)
-    def out(self, f, content):
-        with open(f, 'w') as fd:
-            fd.write(content)
+    def outnl(self, content : str):
+        self.out('\n' + self.indent * 8 * ' ' + content)
+    def out(self, content : str):
+        self.fd.write(content)
     def style_text(self, obj):
         return '\n'.join(obj.get(html_style, list, []))
     def style_build(self):
         self.style_file = self.deck.get(html_style_file, str, 'style.css')
-        self.out(self.style_file, self.style_text(self.deck) + '\n')
-    def href(self, src, tgt):
-        h = '#' + tgt.get(http_anchor)
-        file = tgt.get(http_file)
-        if file != src.get(http_file):
-            h = file + h
+        with open(self.style_file, 'w') as fd:
+            fd.write(self.style_text(self.deck) + '\n')
+    def href(self, fr : node, to : node):
+        h = '#' + to.get(html_anchor)
+        if fr.get(html_file) != to.get(html_file):
+            h = to.get(html_file) + h
         return h
-    def frag_links(self, f):
-        parts = [(True, f.content())]
-        extra = '\n'
-        for l in f.get(link_src, list, []):
-            if (type(l.src) == span):
-                regex = re.compile(l.src.regex)
-                pnew = []
-                for ff in parts:
-                    if not ff[0]:
-                        pnew += [ff]
-                    else:
-                        s = ff[1]
-                        for m in re.finditer(regex, s):
-                            pnew += [(True,  s[0 : m.start()]),
-                                     (False, '<a href="dasdjalsjd">'),
-                                     (True,  s[m.start() : m.end()]),
-                                     (False, '</a>'),
-                                     (True,  s[m.end() : ])]
-                        pnew += [(True, s)]
-                parts = pnew
-            else:
-                assert l.src == f
-                extra += '<p><a href="dsadaas">link</a></p>\n'
-        return ''.join([html.escape(p[1]) if p[0] else p[1] for p in parts]) + extra
-
+            
 engines = {
     'html' : html_eng
 }
-    
+
+L_HERE  = 0
+L_START = 1
+L_END   = 2
+
+INVALID     =  0
+CARD_BEGIN  =  1
+CARD_END    =  2
+FRAG_BEGIN  =  3
+FRAG_END    =  4
+PARA_BEGIN  =  5
+PARA_END    =  6
+CODE_BEGIN  =  7
+CODE_END    =  8
+MATH_BEGIN  =  9
+MATH_END    = 10
+LSRC_BASE   = 11
+LSRC_HERE   = LSRC_BASE + L_HERE
+LSRC_START  = LSRC_BASE + L_START
+LSRC_END    = LSRC_BASE + L_END
+LTGT_BASE   = 15
+LTGT_HERE   = LTGT_BASE + L_HERE
+LTGT_START  = LTGT_BASE + L_START
+LTGT_END    = LTGT_BASE + L_END
+TEXT        = 18
+STYLE_BEGIN = 19
+STYLE_END   = 20
+BEGIN       = 21
+END         = 22
+
+opnames = {
+    INVALID     : "INVALID",
+    CARD_BEGIN  : "CARD_BEGIN",
+    CARD_END    : "CARD_END",
+    FRAG_BEGIN  : "FRAG_BEGIN",
+    FRAG_END    : "FRAG_END",
+    PARA_BEGIN  : "PARA_BEGIN",
+    PARA_END    : "PARA_END",
+    CODE_BEGIN  : "CODE_BEGIN",
+    CODE_END    : "CODE_END",
+    MATH_BEGIN  : "MATH_BEGIN",
+    MATH_END    : "MATH_END",
+    LSRC_HERE   : "LSRC_HERE",
+    LSRC_START  : "LSRC_START",
+    LSRC_END    : "LSRC_END",
+    LTGT_HERE   : "LTGT_HERE",
+    LTGT_START  : "LTGT_START",
+    LTGT_END    : "LTGT_END",
+    TEXT        : "TEXT",
+    STYLE_BEGIN : "STYLE_BEGIN",
+    STYLE_END   : "STYLE_END",
+    BEGIN       : "BEGIN",
+    END         : "END",
+}
+
+@typechecked
+class cmd:
+    def __init__(self, opc : int, obj = None, n : Optional[node] = None):
+        self.opc  = opc
+        self.node = n
+        self.obj  = obj
+    def __str__(self):
+        return opnames[self.opc] + " node: " + str(type(self.node)) + " obj: " + (self.obj if self.opc == TEXT else str(type(self.obj)))
+
 @typechecked
 def cardread(rolodex : deck, file : str) -> None:
     seq = 0
@@ -362,16 +617,16 @@ def cardread(rolodex : deck, file : str) -> None:
             f = frag_types[words[1]](c)
         elif words[0] == '\\':  # New card
             c.frag_add(f)
-            rolodex.add(c);
+            rolodex.card_add(c);
             seq = seq + 1
             c = card.fromfile(rolodex, file, fd, seq)
             f = None
         else:
             if f == None:
                 f = para(c)
-            f.add(rawline)
+            f.line_add(rawline)
     c.frag_add(f)
-    rolodex.add(c);
+    rolodex.card_add(c);
     fd.close()
 
 def main():
