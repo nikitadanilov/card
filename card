@@ -240,6 +240,40 @@ class deck(node):
     def build(self) -> None:
         # print('\n'.join([str(x) for x in self.program()]))
         engines[self.get('engine', str, 'html')]().run(self, self.program())
+    def cardread(self : deck, file : str) -> None:
+        seq = 0
+        fd  = open(file, 'r')
+        c   = card.fromfile(self, file, fd, seq)
+        f   = None
+        for rawline in fd:
+            line = rawline.strip()
+            words = line.split(maxsplit = 2)
+            if len(line) == 0:
+                c.frag_add(f)
+                f = None
+            elif words[0] == '//':  # Card attribute
+                c.set(words[1], words[2])
+            elif words[0] == '/':   # Fragment attribute
+                assert f != None
+                f.set(words[1], words[2])
+            elif words[0] == ';':   # Fragment type
+                c.frag_add(f)
+                f = frag_types[words[1]](c)
+            elif words[0] == '\\':  # New card
+                c.frag_add(f)
+                self.card_add(c);
+                seq = seq + 1
+                c = card.fromfile(self, file, fd, seq)
+                f = None
+            else:
+                if rawline[0] == '|': # Continuation
+                    rawline = rawline[1:]
+                if f == None:
+                    f = para(c)
+                f.line_add(rawline)
+        c.frag_add(f)
+        self.card_add(c);
+        fd.close()
     def tostring(self) -> List[str]:
         return [''] + \
             ['<dock'] + \
@@ -436,6 +470,8 @@ class html_eng(eng):
                                                  'anchor'    : n.get(html_anchor, str, None) }))
     def card_end(self, c : cmd, n : card, o):
         assert o == None
+        for c in n.get(':html-delay', list, []):
+            self.exec(c)
         self.outnl(self.html_card_end)
         self.fd.close()
         self.indent -= 1
@@ -506,6 +542,10 @@ class html_eng(eng):
             self.series_build(s)
         os.chdir('..')
     def series(self, c : cmd, n : card, o : Tuple[str, Optional[card], Optional[card]]) -> None:
+        if c.datum == None:
+            c.datum = True
+            n.add(':html-delay', c)
+            return
         trunk = o[0]
         prev  = o[1]
         next  = o[2]
@@ -630,47 +670,12 @@ opnames = {
 @typechecked
 class cmd:
     def __init__(self, opc : int, obj = None, n : Optional[node] = None):
-        self.opc  = opc
-        self.node = n
-        self.obj  = obj
+        self.opc   = opc
+        self.node  = n
+        self.obj   = obj
+        self.datum = None
     def __str__(self):
         return opnames[self.opc] + " node: " + str(type(self.node)) + " obj: " + (self.obj if self.opc == TEXT else str(type(self.obj)))
-
-@typechecked
-def cardread(rolodex : deck, file : str) -> None:
-    seq = 0
-    fd  = open(file, 'r')
-    c   = card.fromfile(rolodex, file, fd, seq)
-    f   = None
-    for rawline in fd:
-        line = rawline.strip()
-        words = line.split(maxsplit=2)
-        if len(line) == 0:
-            c.frag_add(f)
-            f = None
-        elif words[0] == '//':  # Card attribute
-            c.set(words[1], words[2])
-        elif words[0] == '/':   # Fragment attribute
-            assert f != None
-            f.set(words[1], words[2])
-        elif words[0] == ';':   # Fragment type
-            c.frag_add(f)
-            f = frag_types[words[1]](c)
-        elif words[0] == '\\':  # New card
-            c.frag_add(f)
-            rolodex.card_add(c);
-            seq = seq + 1
-            c = card.fromfile(rolodex, file, fd, seq)
-            f = None
-        else:
-            if rawline[0] == '|': # Continuation
-                rawline = rawline[1:]
-            if f == None:
-                f = para(c)
-            f.line_add(rawline)
-    c.frag_add(f)
-    rolodex.card_add(c);
-    fd.close()
 
 def main():
     parser = argparse.ArgumentParser(description='Card reader.')
@@ -682,7 +687,7 @@ def main():
     rolodex = deck()
     rolodex.configread(args.config)
     for file in args.files:
-        cardread(rolodex, file)
+        rolodex.cardread(file)
     rolodex.crossref()
     rolodex.build()
     if args.verbose:

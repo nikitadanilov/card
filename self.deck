@@ -1,13 +1,13 @@
-// C deck self-documentation deck
+// C card self-documentation deck
 // id intro
+// +# trunk 0
 This is the documentation for the card tool.
 / += . "card" -> https://github.com/nikitadanilov/card
 
-card is similar to various "publishing" tools that take as an input content
+card is similar to various "publishing" tools that take as the input content
 marked up with various formatting instructions and then render it in various
-formats. It is incomparably simpler than hugo or pandoc and its intended scope
-is more of a component in a notetaking system, than a full-blown site publishing
-engine.
+formats. It is much simpler than hugo or pandoc and its intended scope is more
+of a component in a note-taking system, than a full-blown site publishing engine.
 / += . "hugo" -> https://gohugo.io/
 / += . "pandoc" -> https://pandoc.org/
 
@@ -26,15 +26,16 @@ its own quotation):
 / += . "the source code" -> https://github.com/nikitadanilov/card/blob/master/self.deck
 
 ; code
+|// C card self-documentation deck
 |// id intro
+|// +# trunk 0
 |This is the documentation for the card tool.
 |/ += . "card" -> https://github.com/nikitadanilov/card
 |
-|card is similar to various "publishing" tools that take as an input content
+|card is similar to various "publishing" tools that take as the input content
 |marked up with various formatting instructions and then render it in various
-|formats. It is incomparably simpler than hugo or pandoc and its intended scope
-|is more of a component in a notetaking system, than a full-blown site publishing
-|engine.
+|formats. It is much simpler than hugo or pandoc and its intended scope is more
+|of a component in a note-taking system, than a full-blown site publishing engine.
 |/ += . "hugo" -> https://gohugo.io/
 |/ += . "pandoc" -> https://pandoc.org/
 |
@@ -45,7 +46,7 @@ its own quotation):
 |
 |Decks, cards and fragments all have attributes.
 |
-|The documentation is, naturally, maintained via card, the input is here.
+|The documentation is, naturally, maintained via card here.
 |/ += . "here" -> https://github.com/nikitadanilov/card/blob/master/self.deck
 |
 |Here is the source code for this card, so far (this is not a Quine preceeded by
@@ -64,9 +65,8 @@ regular expression "hugo".
 The separation between the text and the markup makes (in my personal opinion,
 that is) the content source more readable.
 
-// +# trunk 0
-
 \
 
 Next card
+// id syntax
 // +# trunk 1
