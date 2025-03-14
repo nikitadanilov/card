@@ -29,7 +29,7 @@ from typeguard import typechecked # Must be installed.
 class node:
     """Base class for deck, card and fragment.
 
-    node knows has a parent node, a dictionary of attributes and can pretty-print
+    node has a parent node, a dictionary of attributes and can pretty-print
     itself.
 
     """
@@ -118,7 +118,7 @@ class para(frag):
 @typechecked
 class code(frag):
     def content(self) -> str: # Do not strip the code
-        return ''.join(self.lines)
+        return ''.join(self.lines).rstrip()
 
 @typechecked
 class math(frag):
@@ -364,14 +364,14 @@ class html_eng(eng):
             '   <style>{style}</style>\n'                     +
             ' </head>\n'                                      +
             ' <body>\n'                                       +
-            '   <a name="{anchor}">');
+            '   <a name="{anchor}"></a>');
         self.html_card_end = (
             ' </body>\n'                                      +
             '</html>\n')
-        self.html_anchor     = '<a name="{anchor}">'
+        self.html_anchor     = '<a name="{anchor}"></a>'
         self.html_frag_pair = {
             para : ('<p{attrs}>',         '</p>'),
-            code : ('<code{attrs}><pre>', '</pre></code>'),
+            code : ('<pre><code{attrs}>', '</code></pre>'),
             math : ('<math{attrs}>',      '</math>')
         }
         self.html_href_pair = ('<a href="{ref}">', '</a>')
@@ -429,7 +429,7 @@ class html_eng(eng):
                                                                 'attrs'   : attrs }))
     def frag_end(self, c : cmd, n : frag, o):
         assert o == None
-        self.outnl(self.html_frag_pair[type(n)][1])
+        self.out(self.html_frag_pair[type(n)][1])
         self.indent -= 1
     def para_begin(self, c : cmd, n : para, o):
         self.frag_begin(c, n, o)
@@ -622,6 +622,8 @@ def cardread(rolodex : deck, file : str) -> None:
             c = card.fromfile(rolodex, file, fd, seq)
             f = None
         else:
+            if rawline[0] == '|': # Continuation
+                rawline = rawline[1:]
             if f == None:
                 f = para(c)
             f.line_add(rawline)

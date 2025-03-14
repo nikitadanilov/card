@@ -61,6 +61,7 @@ SWAP:   MOV (R2), R4
 / += . -> .
 / += . -> !card0
 / += . -> !card0-00003
+/ += . "BPL +\w+" -> https://news.ycombinator.com/
 // +tags TAG0
 // +tags TAG1
 / +html.style color: red; font-size: 18px;

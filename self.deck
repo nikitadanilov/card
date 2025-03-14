@@ -1,0 +1,65 @@
+// C deck self-documentation deck
+// id intro
+This is the documentation for the card tool.
+/ += . "card" -> https://github.com/nikitadanilov/card
+
+card is similar to various "publishing" tools that take as an input content
+marked up with various formatting instructions and then render it in various
+formats. It is incomparably simpler than hugo or pandoc and its intended scope
+is more of a component in a notetaking system, than a full-blown site publishing
+engine.
+/ += . "hugo" -> https://gohugo.io/
+/ += . "pandoc" -> https://pandoc.org/
+
+The input is a "deck", which is a set of "cards", each consisting of
+"fragments". Fragments correspond to paragraphs and things like code and math
+displays in the output. Cards are used to ogranise content into "series", they
+can correspond to pages in the output, but not necessarily.
+
+Decks, cards and fragments all have attributes.
+
+The documentation is, naturally, maintained via card, the input is here.
+/ += . "here" -> https://github.com/nikitadanilov/card/blob/master/self.deck
+
+Here is the source code for this card, so far (this is not a Quine preceeded by
+its own quotation):
+/ += . "the source code" -> https://github.com/nikitadanilov/card/blob/master/self.deck
+
+; code
+|// id intro
+|This is the documentation for the card tool.
+|/ += . "card" -> https://github.com/nikitadanilov/card
+|
+|card is similar to various "publishing" tools that take as an input content
+|marked up with various formatting instructions and then render it in various
+|formats. It is incomparably simpler than hugo or pandoc and its intended scope
+|is more of a component in a notetaking system, than a full-blown site publishing
+|engine.
+|/ += . "hugo" -> https://gohugo.io/
+|/ += . "pandoc" -> https://pandoc.org/
+|
+|The input is a "deck", which is a set of "cards", each consisting of
+|"fragments". Fragments correspond to paragraphs and things like code and math
+|displays in the output. Cards are used to ogranise content into "series", they
+|can correspond to pages in the output, but not necessarily.
+|
+|Decks, cards and fragments all have attributes.
+|
+|The documentation is, naturally, maintained via card, the input is here.
+|/ += . "here" -> https://github.com/nikitadanilov/card/blob/master/self.deck
+|
+|Here is the source code for this card, so far (this is not a Quine preceeded by
+|its own quotation):
+|/ += . "the source code" -> https://github.com/nikitadanilov/card/blob/master/self.deck
+
+Note that markup instructions are not embedded in the text. For example, the
+link to Hugo's website is created by
+
+; code
+|/ += . "hugo" -> https://gohugo.io/
+
+This attaches the hyperlink to the part of the preceding paragraph matching the
+regular expression "hugo".
+
+The separation between the text and the markup makes (in my personal opinion,
+that is) the content source more readable.
