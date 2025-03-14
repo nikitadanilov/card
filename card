@@ -22,6 +22,7 @@ import datetime
 import collections
 import html
 import re
+import requests
 from typing import List, Dict, Optional, Tuple
 from typeguard import typechecked # Must be installed.
 
@@ -160,9 +161,10 @@ class card(node):
 class deck(node):
     def __init__(self):
         node.__init__(self, None)
-        self.cards = []
-        self.ids   = {}
-        self.tags  = collections.defaultdict(list)
+        self.cards  = []
+        self.ids    = {}
+        self.tags   = collections.defaultdict(list)
+        self.series = collections.defaultdict(dict)
     def card_add(self, c : card) -> None:
         assert c.parent == self
         self.cards += [c]
@@ -175,11 +177,21 @@ class deck(node):
             else:
                 assert False
         fd.close()
+    def cardseries(self, obj : node, s : str) -> None:
+        words = s.split()
+        assert len(words) > 0
+        trunk = words[0]
+        zahl  = words[1] if len(words) > 1 else obj.id()
+        assert zahl not in self.series[trunk]
+        self.series[trunk][zahl] = obj
+        obj.add(':#', (trunk, zahl))
     def tagid(self, obj : node) -> None:
         assert obj.id() not in self.ids   # Identifier must be unique.
         self.ids[obj.id()] = obj
         for t in obj.get('tags', list, []):
             self.tags[t] += [obj]
+        for s in obj.get('#', list, []):
+            self.cardseries(obj, s)
     def makelinks(self, n : node):
         for l in n.get('=', list, []):
             link(self, n, l)
@@ -187,6 +199,13 @@ class deck(node):
         for place in n.get(':links', list, []):
             assert place.parent != None
             n.cadd(cmd(place.parent.base(n) + L_HERE, place.parent))
+    def addseries(self, c : card):
+        for (trunk, zahl) in c.get(':#', list, []):
+            sequence = list(self.series[trunk])
+            sequence.sort()
+            pos = sequence.index(zahl)
+            c.cadd(cmd(SERIES, (trunk, self.series[trunk][sequence[pos - 1]] if pos > 0 else None,
+                                       self.series[trunk][sequence[pos + 1]] if pos + 1 < len(sequence) else None)))
     def crossref(self) -> None:
         frag_cmds = {
             para : (PARA_BEGIN, PARA_END),
@@ -206,6 +225,7 @@ class deck(node):
         # Pass 1: build command tree
         for c in self.cards:
             self.addlinks(c)
+            self.addseries(c)
             for f in c.frags:
                 self.addlinks(f)
                 cmds = frag_cmds.get(type(f), (FRAG_BEGIN, FRAG_END))
@@ -247,7 +267,7 @@ class url_place(place):
 
 @typechecked
 class node_place(place):
-    def __init__(self, parent : link, obj : node):
+    def __init__(self, parent : Optional[link], obj : node):
         self.node = obj
         self.parent = parent
     def __str__(self) -> str:
@@ -396,7 +416,8 @@ class html_eng(eng):
             STYLE_BEGIN : html_eng.style_begin,
             STYLE_END   : html_eng.style_end,
             BEGIN       : html_eng.begin,
-            END         : html_eng.end
+            END         : html_eng.end,
+            SERIES      : html_eng.series
         }
     def run(self, d : deck, p : List[cmd]) -> None:
         self.deck = d
@@ -484,6 +505,24 @@ class html_eng(eng):
         for s in self.series:
             self.series_build(s)
         os.chdir('..')
+    def series(self, c : cmd, n : card, o : Tuple[str, Optional[card], Optional[card]]) -> None:
+        trunk = o[0]
+        prev  = o[1]
+        next  = o[2]
+        self.out('<p>')
+        if prev != None:
+            self.href_start(n, node_place(None, prev))
+        self.text(c, n, '<')
+        if prev != None:
+            self.href_end()
+        self.text(c, n, ' ' + trunk + ' ')
+        if next != None:
+            self.href_start(n, node_place(None, next))
+        self.text(c, n, '>')
+        if next != None:
+            self.href_end()
+        self.out('</p>')
+        
     def prep(self): # Build all filenames and anchors.
         for c in self.deck.cards:
             file = c.get(html_file, str, c.id() + '.html')
@@ -560,6 +599,7 @@ STYLE_BEGIN = 19
 STYLE_END   = 20
 BEGIN       = 21
 END         = 22
+SERIES      = 23
 
 opnames = {
     INVALID     : "INVALID",
@@ -584,6 +624,7 @@ opnames = {
     STYLE_END   : "STYLE_END",
     BEGIN       : "BEGIN",
     END         : "END",
+    SERIES      : "SERIES"
 }
 
 @typechecked

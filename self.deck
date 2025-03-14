@@ -18,7 +18,7 @@ can correspond to pages in the output, but not necessarily.
 
 Decks, cards and fragments all have attributes.
 
-The documentation is, naturally, maintained via card, the input is here.
+The documentation is, naturally, maintained via card here.
 / += . "here" -> https://github.com/nikitadanilov/card/blob/master/self.deck
 
 Here is the source code for this card, so far (this is not a Quine preceeded by
@@ -63,3 +63,10 @@ regular expression "hugo".
 
 The separation between the text and the markup makes (in my personal opinion,
 that is) the content source more readable.
+
+// +# trunk 0
+
+\
+
+Next card
+// +# trunk 1
