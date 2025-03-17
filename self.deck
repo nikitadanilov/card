@@ -69,11 +69,10 @@ that is) the content source more readable.
 
 // id phases
 // +# trunk 1
-Card operation can be divided into the following phases:
+Deck processing happens in the following phases:
 
-Syntax. At this _phase_ the deck is read from the file, the cards and fragments
-are identified and the attributes are attached to them.
-
-Code: `x := x + 1`. Continue! Here, e.g., in the abcd, following.
-/ +cd (?P<open>)ntinue(?P<close>)
-/ +bd (?P<open>)tin(?P<close>)
+*1*. Syntax. The deck consists of one of more _cardfiles_. Cardfiles are read
+ sequentially and parsed. The word "parsed" should not be taken too
+ seriously. There is no formal grammar and the "parser" is just a bunch of
+ str.split() and str.strip() calls. The main parser's logic is in
+ card.cardread() function.
