@@ -30,8 +30,8 @@ from typeguard import typechecked # Must be installed.
 class node:
     """Base class for deck, card and fragment.
 
-    node has a parent node, a dictionary of attributes and can pretty-print
-    itself.
+    node has a parent node, a dictionary of attributes, a lists of formatting
+    commands and can pretty-print itself.
 
     """
     def __init__(self, parent : Optional[node]):
@@ -68,7 +68,7 @@ class node:
     def cadd(self, incmd : cmd):
         incmd.node = self
         self.incmd += [incmd]
-    def makeseq(self, base : str) -> str: # Need 'int'!
+    def makeseq(self, base : str) -> str: # Need 'int' on the next line!
         return (base + '-' + '{:05}'.format(self.get('seq', int, None))).replace(' ', '-')
     def indent(self, n : int, lines) -> List[str]:
         return [n * ' ' + x.rstrip('\n') for x in lines]
@@ -87,9 +87,16 @@ class node:
     
 @typechecked
 class frag(node):
+    """A fragment is something like a paragraph, an image or a code display.
+
+    Fragment's text is stored in self.lines. ':markers' attribute contains the
+    list of markers associated with particular places in the text (given by
+    offsets).
+    """
     def __init__(self, c : card):
         node.__init__(self, c)
         self.lines = []
+        self.set(':markers', collections.defaultdict(list))
     def line_add(self, line : str):
         self.lines += [line]
     def content(self) -> str:
@@ -97,7 +104,8 @@ class frag(node):
     def id(self) -> str:
         return self.makeseq(self.parent.id())
     def cut(self):
-        text = self.content()
+        """Split the processed content into text segments separated by marker commands."""
+        text = self.get(':processed', str, self.content())
         last = 0
         markers = self.attrs.get(':markers', [])
         for idx in sorted(markers):
@@ -217,12 +225,12 @@ class deck(node):
             self.tagid(c)
             for f in c.frags:
                 self.tagid(f)
-        # Pass 1: build links
+        # Pass 1: build the links
         for c in self.cards:
             self.makelinks(c)
             for f in c.frags:
                 self.makelinks(f)
-        # Pass 1: build command tree
+        # Pass 2: build the command tree
         for c in self.cards:
             self.addlinks(c)
             self.addseries(c)
@@ -231,11 +239,12 @@ class deck(node):
                 cmds = frag_cmds.get(type(f), (FRAG_BEGIN, FRAG_END))
                 f.into(cmd(cmds[0]), cmd(cmds[1]))
                 for s in f.get(':spans', list, []) + c.get(':spans', list, []) + self.get(':spans', list, []):
-                    s.resolve()
+                    s.apply(f)
                 f.cut()
             c.pair(cmd(CARD_BEGIN), cmd(CARD_END))
         self.pair(cmd(BEGIN), cmd(END))
     def program(self):
+        """Build the program by traversing the node tree."""
         return self.incmd + sum([c.program() for c in self.cards], []) + self.excmd
     def build(self) -> None:
         # print('\n'.join([str(x) for x in self.program()]))
@@ -286,8 +295,61 @@ class deck(node):
             self.indent(8, sum([c.tostring() + ['********'] for c in self.cards], [])) + \
             ['>']
 
+class span:
+    """A span is a pattern of contiguous extent of text decorated in some way.
+
+    A span can be "applied" to a given a string, typically a fragment's content:
+    find all extents in the string to which the span applies. For each match:
+
+        - apply span transformation function,
+
+        - add markers (which are typically commands) for the matched extent.
+
+    """
+    def __init__(self):
+        pass
+    def find(self, s : str):
+        assert False # Define in sub-classes!
+    def transform(self, s : str, m):
+        assert False # Define in sub-classes!
+    def decorate(self, m):
+        assert False # Define in sub-classes!
+        
+    def apply(self, n : node) -> None:
+        out     = n.get(':processed', str, n.content())
+        markers = n.attrs[':markers']
+        pos     = 0
+        while True:
+            m = self.find(out, pos)
+            if m == None:
+                break
+            (out, pos) = self.transform(out, m)
+            (inp, exp) = self.decorate(m)
+            for (idx, cmd) in inp:
+                markers[idx] = markers[idx] + [cmd]
+            for (idx, cmd) in exp:
+                markers[idx] = [cmd] + markers[idx]
+        n.set(':markers', markers)
+        n.set(':processed', out)
+
+class respan(span):
+    """Span based on a regular expression."""
+    def __init__(self, pattern : str):
+        self.re    = pattern
+        self.regex = re.compile(pattern)
+    def find(self, s : str, pos : int):
+        return self.regex.search(s, pos)
+    def transform(self, s : str, m) -> Tuple[str, int]:
+        return (s, m.end())
+    def __str__(self) -> str:
+        return 'span: ' + self.node.id() + ' "' + self.pattern + '"'
+    def __repr__(self) -> str:
+        return self.__str__()
+    
 @typechecked
 class place:
+    """A place is the source or the target of a link.
+    """
     pass
 
 @typechecked
@@ -301,38 +363,34 @@ class url_place(place):
 
 @typechecked
 class node_place(place):
-    def __init__(self, parent : Optional[link], obj : node):
-        self.node = obj
+    def __init__(self, parent : Optional[link], n : node):
+        self.node = n
         self.parent = parent
+        self.node.add(':links', self)
     def __str__(self) -> str:
         return 'node: ' + self.node.id()
 
 @typechecked
-class span(place):
+class span_place(place):
+    class link_span(respan):
+        def __init__(self, place : span_place, re : str):
+            super().__init__(re)
+            self.place = place
+        def decorate(self, m : re.Match) -> Tuple[List[cmd], List[cmd]]:
+            return ([(m.start(), cmd(self.place.base + L_START, self.place.parent))],
+                    [(m.end(),   cmd(self.place.base + L_END,   self.place.parent))])
     def __init__(self, parent : link, obj : node, pattern : str, base : int):
-        self.node    = obj
-        self.parent  = parent
-        self.pattern = pattern
-        self.base    = base
-        self.regex   = re.compile(pattern)
-    def resolve(self) -> None:
-        assert isinstance(self.node, card) or isinstance(self.node, frag)
+        self.node   = obj
+        self.parent = parent
+        self.span   = span_place.link_span(self, pattern)
+        self.base   = base
         if isinstance(self.node, card):
             assert self.parent != None
-            self.node.cadd(cmd(self.base + L_HERE, self.parent))
-            return
-        text = self.node.content()
-        if not self.node.get(':markers'):
-            self.node.set(':markers', collections.defaultdict(list))
-        markers = self.node.attrs[':markers']
-        for m in re.finditer(self.regex, text):
-            # Check that there is no overlap
-            assert any([i not in markers for i in range(m.start(), m.end())])
-            markers[m.start()] = markers[m.start()] + [cmd(self.base + L_START, self.parent)]
-            markers[m.end()]   = [cmd(self.base + L_END, self.parent)] + markers[m.end()]
-        self.node.set(':markers', markers)
+            self.node.add(':links', self)
+        elif isinstance(self.node, frag):
+            self.node.add(':spans', self.span)
     def __str__(self) -> str:
-        return 'span: ' + self.node.id() + ' "' + self.pattern + '"'
+        return 'span_place: ' + self.node.id() + ' "' + self.pattern + '"'
     def __repr__(self) -> str:
         return self.__str__()
 
@@ -379,12 +437,8 @@ class link:
             assert rest[ 0] == '"'
             assert rest[-1] == '"'
             parts = rest[1:].split('"', 1)
-            splace = span(self, obj, rest[1:-1], base)
-            obj.add(':spans', splace)
-            return splace
+            return span_place(self, obj, rest[1:-1], base)
         else:
-            nplace = node_place(self, obj)
-            obj.add(':links', nplace)
             return node_place(self, obj)
     def base(self, n : node) -> int:
         assert n == self.src.node or n == self.tgt.node
@@ -576,7 +630,7 @@ class html_eng(eng):
         if isinstance(p, url_place):
             ref = p.url
         else:
-            assert isinstance(p, span) or isinstance(p, node_place)
+            assert isinstance(p, span_place) or isinstance(p, node_place)
             ref = self.href(fr, p.node)
         self.out(self.html_href_pair[0].format(**{ 'ref' : ref }))
     def href_end(self):

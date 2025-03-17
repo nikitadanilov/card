@@ -67,6 +67,9 @@ that is) the content source more readable.
 
 \
 
-Next card
-// id syntax
+// id phases
 // +# trunk 1
+Card operation can be divided into the following phases:
+
+Syntax. At this phase the deck is read from the file, the cards and fragments
+are identified and the attributes are attached to them.
