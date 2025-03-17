@@ -49,12 +49,18 @@ class node:
             self.add(key[1:], value)
         else:
             self.attrs[key] = value
+            if (self.debug(4)):
+                print('set:   "{}" to "{}"'.format(key, self.attrs[key]))
     def add(self, key : str, value) -> None:
         self.attrs[key] = self.attrs.get(key, []) + [value]
+        if (self.debug(4)):
+            print('added: "{}" to "{}"'.format(key, self.attrs[key]))
     def get(self, key, ttype : type = str, default = None):
         return ttype(self.attrs.get(key)) if self.has(key) else default
     def has(self, key : str) -> bool:
         return key in self.attrs
+    def debug(self, level : int) -> bool:
+        return self.get('DEBUG', int, 0) >= level
     def pair(self, incmd : cmd, excmd : cmd):
         incmd.node = self
         excmd.node = self
@@ -68,14 +74,23 @@ class node:
     def cadd(self, incmd : cmd):
         incmd.node = self
         self.incmd += [incmd]
+    def ancestry(self) -> List[node]:
+        a = []
+        cur = self
+        while cur != None:
+            a += [cur]
+            cur = cur.parent
+        return a
+    def join(self, attr : str):
+        return sum([x.get(attr, list, []) for x in self.ancestry()], [])
+    def deck(self):
+        return self.ancestry()[-1]
     def makeseq(self, base : str) -> str: # Need 'int' on the next line!
         return (base + '-' + '{:05}'.format(self.get('seq', int, None))).replace(' ', '-')
     def indent(self, n : int, lines) -> List[str]:
         return [n * ' ' + x.rstrip('\n') for x in lines]
-    def dictstring(self, d) -> List[str]:
-        return ['{} : {}'.format(key, d[key]) for key in d]
     def astring(self) -> List[str]:
-        return self.dictstring(self.attrs)
+        return dictstring(self.attrs)
     def tostring(self) -> List[str]:
         return self.astring() + \
             ['-incmds--'] + self.indent(8, [x.__str__() for x in self.incmd]) + \
@@ -108,6 +123,8 @@ class frag(node):
         text = self.get(':processed', str, self.content())
         last = 0
         markers = self.attrs.get(':markers', [])
+        if (self.debug(2)):
+            print('cut: markers-in ', recstring(markers))
         for idx in sorted(markers):
             if idx > 0:
                 self.cadd(cmd(TEXT, text[last : idx]))
@@ -193,6 +210,8 @@ class deck(node):
         assert zahl not in self.series[trunk]
         self.series[trunk][zahl] = obj
         obj.add(':#', (trunk, zahl))
+    def id(self) -> str:
+        return 'pleroma'
     def tagid(self, obj : node) -> None:
         assert obj.id() not in self.ids   # Identifier must be unique.
         self.ids[obj.id()] = obj
@@ -201,11 +220,11 @@ class deck(node):
         for s in obj.get('#', list, []):
             self.cardseries(obj, s)
     def makelinks(self, n : node):
-        for l in n.get('=', list, []):
+        for l in n.join('='):
             link(self, n, l)
     def addstyles(self, n : node):
         for s in stylenames:
-            for regex in n.get(s, list, []):
+            for regex in n.join(s):
                 n.add(':spans', stylespan(regex, s))
     def addlinks(self, n : node):
         for place in n.get(':links', list, []):
@@ -225,6 +244,7 @@ class deck(node):
             code : (CODE_BEGIN, CODE_END)
         }
         # Pass 0: build identifiers index, it is needed to resolve link names, etc. later.
+        self.tagid(self)
         for c in self.cards:
             self.tagid(c)
             for f in c.frags:
@@ -235,6 +255,7 @@ class deck(node):
             for f in c.frags:
                 self.makelinks(f)
         # Pass 2: build the command tree
+        self.addlinks(self)
         self.addstyles(self)
         for c in self.cards:
             self.addlinks(c)
@@ -245,7 +266,7 @@ class deck(node):
                 self.addstyles(f)
                 cmds = frag_cmds.get(type(f), (FRAG_BEGIN, FRAG_END))
                 f.into(cmd(cmds[0]), cmd(cmds[1]))
-                for s in f.get(':spans', list, []) + c.get(':spans', list, []) + self.get(':spans', list, []):
+                for s in f.get(':spans', list, []):
                     s.apply(f)
                 f.cut()
             c.pair(cmd(CARD_BEGIN), cmd(CARD_END))
@@ -324,22 +345,34 @@ class span:
         out     = n.get(':processed', str, n.content())
         markers = n.attrs[':markers']
         pos     = 0
+        if (n.debug(2)):
+            print('apply: markers-in', recstring(markers))
         while True:
             m = self.find(out, pos)
             if m == None:
                 break
             (out, pos, deltas, inp, exp) = self.transform(out, m)
+            if (n.debug(3)):
+                print('    out', out, '\n    pos', pos, '\n    deltas', recstring(deltas),
+                      '\n    inp', recstring(inp), '\n    exp', recstring(exp));
             for (p, delta) in deltas: # Adjust existing markers to the changed offsets.
+                if delta == 0:
+                    continue
                 for idx in sorted(markers, reverse = delta > 0):
                     if idx > p:
                         markers[idx + delta] += markers[idx]
                         del markers[idx]
+                if (n.debug(3)):
+                    print('    Adjusted markers to ', p, delta)
+                    print('             markers    ', recstring(markers))
             for (idx, cmd) in inp:
                 markers[idx] = markers[idx] + [cmd]
             for (idx, cmd) in exp:
                 markers[idx] = [cmd] + markers[idx]
         n.set(':markers', markers)
         n.set(':processed', out)
+        if (n.debug(2)):
+            print('apply: markers-ex', recstring(markers))
 
 class respan(span):
     """Span based on a regular expression."""
@@ -386,19 +419,30 @@ class span_place(place):
             super().__init__(re)
             self.place = place
         def transform(self, s : str, m) -> Tuple[str, int, List[Tuple[int, int]], List[Tuple(int, cmd)], List[Tuple(int, cmd)]]:
+            # Adjust the other end, given the match.
+            oldlink = self.place.parent
+            if self.place.base == LSRC_BASE:
+                other = oldlink.tgt
+            else:
+                other = oldlink.src
+            if isinstance(other, url_place):
+                # Create new link with replaced target
+                newlink = link(oldlink.obj.deck(), oldlink.obj, ". -> .")
+                copy = url_place(newlink, other.url.format(**m.groupdict()))
+                if self.place.base == LSRC_BASE:
+                    newlink.tgt = copy
+                else:
+                    newlink.src = copy
+            oldlink = newlink
             return (s, m.end(), [],
-                    [(m.start(), cmd(self.place.base + L_START, self.place.parent))],
-                    [(m.end(),   cmd(self.place.base + L_END,   self.place.parent))])
+                    [(m.start(), cmd(self.place.base + L_START, oldlink))],
+                    [(m.end(),   cmd(self.place.base + L_END,   oldlink))])
     def __init__(self, parent : link, obj : node, pattern : str, base : int):
         self.node   = obj
         self.parent = parent
         self.span   = span_place.link_span(self, pattern)
         self.base   = base
-        if isinstance(self.node, card):
-            assert self.parent != None
-            self.node.add(':links', self)
-        elif isinstance(self.node, frag):
-            self.node.add(':spans', self.span)
+        self.node.add(':spans', self.span)
     def __str__(self) -> str:
         return 'span_place: "' + self.pattern + '"'
     def __repr__(self) -> str:
@@ -421,11 +465,13 @@ class cmdspan(respan):
             (replacement, incmd, excmd) = self.acts[aname]
             if start > 0:
                 out += s[last : start]
+            orig = m.group(aname)
+            repl = replacement.format(orig)
             if replacement != None:
-                out += replacement
-                deltas += [(len(out), len(replacement) - len(m.group(aname)))]
+                out += repl
+                deltas += [(len(out), len(repl) - len(orig))]
             else:
-                out += m.group(aname)
+                out += orig
             if incmd != None:
                 inp += [(len(out), incmd)]
             if excmd != None:
@@ -794,7 +840,19 @@ class cmd:
         self.obj   = obj
         self.datum = None
     def __str__(self):
-        return opnames[self.opc] + ' node: ' + str(type(self.node)) + ' obj: ' + (self.obj if self.opc == TEXT else str(type(self.obj)))
+        return opnames[self.opc] + (' ' + self.obj if self.opc == TEXT else '')
+
+def dictstring(d, eprint = lambda x: str(x)) -> List[str]:
+    return ['{} : {}'.format(key, eprint(d[key])) for key in d]
+def recstring(x) -> str:
+    if isinstance(x, dict):
+        return '{' + ', '.join(dictstring(x, recstring)) + '}'
+    elif isinstance(x, list):
+        return '[' + ', '.join([recstring(e) for e in x]) + ']'
+    elif isinstance(x, tuple):
+        return '(' + ', '.join([recstring(e) for e in x]) + ')'
+    else:
+        return x.__str__()
 
 def main():
     parser = argparse.ArgumentParser(description='Card reader.')
