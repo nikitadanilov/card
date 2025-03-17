@@ -203,6 +203,10 @@ class deck(node):
     def makelinks(self, n : node):
         for l in n.get('=', list, []):
             link(self, n, l)
+    def addstyles(self, n : node):
+        for s in stylenames:
+            for regex in n.get(s, list, []):
+                n.add(':spans', stylespan(regex, s))
     def addlinks(self, n : node):
         for place in n.get(':links', list, []):
             assert place.parent != None
@@ -231,11 +235,14 @@ class deck(node):
             for f in c.frags:
                 self.makelinks(f)
         # Pass 2: build the command tree
+        self.addstyles(self)
         for c in self.cards:
             self.addlinks(c)
             self.addseries(c)
+            self.addstyles(c)
             for f in c.frags:
                 self.addlinks(f)
+                self.addstyles(f)
                 cmds = frag_cmds.get(type(f), (FRAG_BEGIN, FRAG_END))
                 f.into(cmd(cmds[0]), cmd(cmds[1]))
                 for s in f.get(':spans', list, []) + c.get(':spans', list, []) + self.get(':spans', list, []):
@@ -312,8 +319,6 @@ class span:
         assert False # Define in sub-classes!
     def transform(self, s : str, m):
         assert False # Define in sub-classes!
-    def decorate(self, m):
-        assert False # Define in sub-classes!
         
     def apply(self, n : node) -> None:
         out     = n.get(':processed', str, n.content())
@@ -323,8 +328,12 @@ class span:
             m = self.find(out, pos)
             if m == None:
                 break
-            (out, pos) = self.transform(out, m)
-            (inp, exp) = self.decorate(m)
+            (out, pos, deltas, inp, exp) = self.transform(out, m)
+            for (p, delta) in deltas: # Adjust existing markers to the changed offsets.
+                for idx in sorted(markers, reverse = delta > 0):
+                    if idx > p:
+                        markers[idx + delta] += markers[idx]
+                        del markers[idx]
             for (idx, cmd) in inp:
                 markers[idx] = markers[idx] + [cmd]
             for (idx, cmd) in exp:
@@ -339,10 +348,10 @@ class respan(span):
         self.regex = re.compile(pattern)
     def find(self, s : str, pos : int):
         return self.regex.search(s, pos)
-    def transform(self, s : str, m) -> Tuple[str, int]:
-        return (s, m.end())
+    def transform(self, s : str, m) -> Tuple[str, int, List[Tuple[int, int]], List[Tuple(int, cmd)], List[Tuple(int, cmd)]]:
+        return (s, m.end(), [], [], [])
     def __str__(self) -> str:
-        return 'span: ' + self.node.id() + ' "' + self.pattern + '"'
+        return 'respan: "' + self.re + '"'
     def __repr__(self) -> str:
         return self.__str__()
     
@@ -376,8 +385,9 @@ class span_place(place):
         def __init__(self, place : span_place, re : str):
             super().__init__(re)
             self.place = place
-        def decorate(self, m : re.Match) -> Tuple[List[cmd], List[cmd]]:
-            return ([(m.start(), cmd(self.place.base + L_START, self.place.parent))],
+        def transform(self, s : str, m) -> Tuple[str, int, List[Tuple[int, int]], List[Tuple(int, cmd)], List[Tuple(int, cmd)]]:
+            return (s, m.end(), [],
+                    [(m.start(), cmd(self.place.base + L_START, self.place.parent))],
                     [(m.end(),   cmd(self.place.base + L_END,   self.place.parent))])
     def __init__(self, parent : link, obj : node, pattern : str, base : int):
         self.node   = obj
@@ -390,9 +400,46 @@ class span_place(place):
         elif isinstance(self.node, frag):
             self.node.add(':spans', self.span)
     def __str__(self) -> str:
-        return 'span_place: ' + self.node.id() + ' "' + self.pattern + '"'
+        return 'span_place: "' + self.pattern + '"'
     def __repr__(self) -> str:
         return self.__str__()
+
+class cmdspan(respan):
+    """Span decorating the extent with particular commands."""
+    def __init__(self, pattern : str, acts : Dict[str, (Optional[str], Optional[cmd], Optional[cmd])]):
+        super().__init__(pattern)
+        self.acts = acts
+    def transform(self, s : str, m) -> Tuple[str, int, List[Tuple[int, int]], List[Tuple(int, cmd)], List[Tuple(int, cmd)]]:
+        # Sort the matched groups
+        groups = sorted([(m.span(aname), aname) for aname in self.acts], key = lambda x: x[0][0])
+        out  = ''
+        last = 0
+        inp  = []
+        exp  = []
+        deltas = []
+        for ((start, end), aname) in groups:
+            (replacement, incmd, excmd) = self.acts[aname]
+            if start > 0:
+                out += s[last : start]
+            if replacement != None:
+                out += replacement
+                deltas += [(len(out), len(replacement) - len(m.group(aname)))]
+            else:
+                out += m.group(aname)
+            if incmd != None:
+                inp += [(len(out), incmd)]
+            if excmd != None:
+                exp += [(len(out), excmd)]
+            last = end
+        term = len(out)
+        out += s[last:]
+        return (out, term, deltas, inp, exp)
+
+class stylespan(cmdspan):
+    def __init__(self, pattern : str, style : str):
+        styleop = stylenames[style]
+        super().__init__(pattern, { 'open'  : ('', cmd(STYLE_BEGIN, styleop), None),
+                                    'close' : ('', None, cmd(STYLE_END, styleop)) })
 
 @typechecked
 class link:
@@ -483,6 +530,12 @@ class html_eng(eng):
             math : ('<math{attrs}>',      '</math>')
         }
         self.html_href_pair = ('<a href="{ref}">', '</a>')
+        self.html_styles_pair = {
+            S_EMPHASIS : ('<em>',   '</em>'),
+            S_ITALIC   : ('<i>',    '</i>'),
+            S_BOLD     : ('<b>',    '</b>'),
+            S_CODE     : ('<code class="inline">', '</code>')
+        }
         self.commands = {
             CARD_BEGIN  : html_eng.card_begin,
             CARD_END    : html_eng.card_end,
@@ -576,10 +629,10 @@ class html_eng(eng):
         pass
     def text(self, c : cmd, n : node, o : str):
         self.out(html.escape(o))
-    def style_begin(self, c : cmd, n : node, o : str):
-        pass
-    def style_end(self, c : cmd, n : node, o):
-        pass
+    def style_begin(self, c : cmd, n : node, style : int):
+        self.out(self.html_styles_pair[style][0])
+    def style_end(self, c : cmd, n : node, style : int):
+        self.out(self.html_styles_pair[style][1])
     def begin(self, c : cmd, n : node, o):
         assert o == None
         dir = self.deck.get('dir', str, 'html_out')
@@ -696,29 +749,41 @@ END         = 22
 SERIES      = 23
 
 opnames = {
-    INVALID     : "INVALID",
-    CARD_BEGIN  : "CARD_BEGIN",
-    CARD_END    : "CARD_END",
-    FRAG_BEGIN  : "FRAG_BEGIN",
-    FRAG_END    : "FRAG_END",
-    PARA_BEGIN  : "PARA_BEGIN",
-    PARA_END    : "PARA_END",
-    CODE_BEGIN  : "CODE_BEGIN",
-    CODE_END    : "CODE_END",
-    MATH_BEGIN  : "MATH_BEGIN",
-    MATH_END    : "MATH_END",
-    LSRC_HERE   : "LSRC_HERE",
-    LSRC_START  : "LSRC_START",
-    LSRC_END    : "LSRC_END",
-    LTGT_HERE   : "LTGT_HERE",
-    LTGT_START  : "LTGT_START",
-    LTGT_END    : "LTGT_END",
-    TEXT        : "TEXT",
-    STYLE_BEGIN : "STYLE_BEGIN",
-    STYLE_END   : "STYLE_END",
-    BEGIN       : "BEGIN",
-    END         : "END",
-    SERIES      : "SERIES"
+    INVALID     : 'INVALID',
+    CARD_BEGIN  : 'CARD_BEGIN',
+    CARD_END    : 'CARD_END',
+    FRAG_BEGIN  : 'FRAG_BEGIN',
+    FRAG_END    : 'FRAG_END',
+    PARA_BEGIN  : 'PARA_BEGIN',
+    PARA_END    : 'PARA_END',
+    CODE_BEGIN  : 'CODE_BEGIN',
+    CODE_END    : 'CODE_END',
+    MATH_BEGIN  : 'MATH_BEGIN',
+    MATH_END    : 'MATH_END',
+    LSRC_HERE   : 'LSRC_HERE',
+    LSRC_START  : 'LSRC_START',
+    LSRC_END    : 'LSRC_END',
+    LTGT_HERE   : 'LTGT_HERE',
+    LTGT_START  : 'LTGT_START',
+    LTGT_END    : 'LTGT_END',
+    TEXT        : 'TEXT',
+    STYLE_BEGIN : 'STYLE_BEGIN',
+    STYLE_END   : 'STYLE_END',
+    BEGIN       : 'BEGIN',
+    END         : 'END',
+    SERIES      : 'SERIES'
+}
+
+S_EMPHASIS = 1
+S_ITALIC   = 2
+S_BOLD     = 3
+S_CODE     = 4
+
+stylenames = {
+    'em' : S_EMPHASIS,
+    'it' : S_ITALIC,
+    'bd' : S_BOLD,
+    'cd' : S_CODE
 }
 
 @typechecked
@@ -729,7 +794,7 @@ class cmd:
         self.obj   = obj
         self.datum = None
     def __str__(self):
-        return opnames[self.opc] + " node: " + str(type(self.node)) + " obj: " + (self.obj if self.opc == TEXT else str(type(self.obj)))
+        return opnames[self.opc] + ' node: ' + str(type(self.node)) + ' obj: ' + (self.obj if self.opc == TEXT else str(type(self.obj)))
 
 def main():
     parser = argparse.ArgumentParser(description='Card reader.')
