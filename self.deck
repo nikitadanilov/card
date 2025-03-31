@@ -75,4 +75,5 @@ Deck processing happens in the following phases:
  sequentially and parsed. The word "parsed" should not be taken too
  seriously. There is no formal grammar and the "parser" is just a bunch of
  str.split() and str.strip() calls. The main parser's logic is in
- card.cardread() function.
+ card.cardread() function. (Fun fact: the hyperlinks to the functions in the
+ preceding sentences are generated automatically.)
