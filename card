@@ -288,22 +288,24 @@ class deck(node):
             if len(line) == 0:
                 c.frag_add(f)
                 f = None
-            elif words[0] == '//':  # Card attribute
+            elif words[0] == '///':         # Deck attribute
+                self.set(words[1], words[2]) 
+            elif words[0] == '//':           # Card attribute
                 c.set(words[1], words[2])
-            elif words[0] == '/':   # Fragment attribute
+            elif words[0] == '/':            # Fragment attribute
                 assert f != None
                 f.set(words[1], words[2])
-            elif words[0] == ';':   # Fragment type
+            elif words[0] == ';':            # Fragment type
                 c.frag_add(f)
                 f = frag_types[words[1]](c)
-            elif words[0] == '\\':  # New card
+            elif words[0] == '\\':           # New card
                 c.frag_add(f)
                 self.card_add(c);
                 seq = seq + 1
                 c = card.fromfile(self, file, fd, seq)
                 f = None
             else:
-                if rawline[0] == '|': # Continuation
+                if rawline[0] == '|':        # Continuation
                     rawline = rawline[1:]
                 if f == None:
                     f = para(c)
@@ -856,13 +858,11 @@ def recstring(x) -> str:
 
 def main():
     parser = argparse.ArgumentParser(description='Card reader.')
-    parser.add_argument('-c', '--config', type=str, default='card.conf', help='Config file.')
     parser.add_argument('-v', '--verbose', action='store_true', help='Enable verbose mode.')
     parser.add_argument('files', nargs=argparse.REMAINDER, help='Card files to be processed.')
     args = parser.parse_args()
 
     rolodex = deck()
-    rolodex.configread(args.config)
     for file in args.files:
         rolodex.cardread(file)
     rolodex.crossref()
