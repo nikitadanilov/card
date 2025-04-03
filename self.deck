@@ -71,9 +71,166 @@ that is) the content source more readable.
 // +# trunk 1
 Deck processing happens in the following phases:
 
-*1*. Syntax. The deck consists of one of more _cardfiles_. Cardfiles are read
+> *1*. Syntax. The deck consists of one of more _cardfiles_. Cardfiles are read
  sequentially and parsed. The word "parsed" should not be taken too
  seriously. There is no formal grammar and the "parser" is just a bunch of
  str.split() and str.strip() calls. The main parser's logic is in
  card.cardread() function. (Fun fact: the hyperlinks to the functions in the
- preceding sentences are generated automatically.)
+ preceding sentences are generated automatically.) A cardfile consists of:
+
+>>       – the formatting instruction indicating the boundaries between fragments and cards,
+
+>>       – the text of the fragments and
+
+>>       – the _attributes_ associated with a fragment or a
+           card or a deck. An attribute is a key-value pair, where the key is a string and
+           the value is either a string or a list of strings.
+
+> The deck, cards and fragments are _nodes_. The parser builds a tree of nodes
+ with the deck as the root and with cards and fragments as its children and
+ grandchildren respectively.
+
+> *2*. Cross-referencing. The next phase, implemented in card.crossref()
+   function, interprets attributes to create _layout instructions_ for the
+   text. This happens in multiple steps:
+
+>>       – First, each element in the tree is assigned a unique identifier that is used
+           to refer to it in the future. The user can specify the identifier by setting
+           the `id` attribute.
+
+>>       – Then, card are orgnised into collection according to _tags_ and _series_. *TDB*.
+
+>>       – At the next step, styles and links are applied. This is the most involved
+           part of layout creation. Styles and links are specified by regular
+           expressions. The expressions are matched against the next,
+           appropriate layout commands are inserted and the text is split into
+           pieces. card supports general link mechanism: both ends of a link can
+           be specified by an URL, an identifier of a node in the deck, or an
+           identifier together with a regular expression.
+
+>>       – Once all layout instructions are generated their are assumbled into a program
+           for an abstract layout engine.
+
+> *3*. In the final step, the abstract program is executed by an engine (only
+   HTML engine exists at the moment), which produces the output.
+
+> We shall now look at each of the phases in more detail.
+
+\
+
+// id syntax
+// +# trunk 2
+
+The cardfile syntax is extremely simple and line-oriented. The first character
+of a line determines the parser state transition.
+
+> – An empty line marks the end of the previous fragment (if any). Multiple empty
+  lines count as one.
+
+> – A line starting with a `;` specifies the type of the immediately following
+  fragment (currently one of `para`, `code` and `math`):
+
+; code
+>; code
+|EVCOMB: ARGS := '()
+|EVCOM1: TYPE-DISPATCH ON EXP INTO
+|                "COMBINATION": GOTO EVCOM2
+|                "FUNCALL": GOTO CALL
+|                "CONS": GOTO CONS
+|                "CAR": GOTO CAR
+|                "CDR": GOTO CDR
+|        HCTAPSID-EPYT
+|/ += . "EVCOMB(?=:)" -> https://dl.acm.org/doi/pdf/10.1145/359024.359031
+|
+|; para
+|The previous fragment was a block display of code with an embedded link. This
+|fragment is a text paragraph.
+/ += . "EVCOMB(?=:)" -> https://dl.acm.org/doi/pdf/10.1145/359024.359031
+
+> If the fragment type is not specified, the next fragment will be a paragraph.
+
+; code
+>; para
+|This fragment is a text paragraph.
+|
+|This fragment is a text paragraph too.
+
+> – A line starting with a `\` indicates the beginning of a new card. This makes
+  it possible to have multiple cards in one file.
+
+> – A line starting with `///` is a deck attribute. A line starting with a `//` is
+  a card attribute and a line starting with `/` is a fragment attribute. All
+  attributes have the same syntax: the key and the value separates by spaces. If
+  the key starts with `+`, the value is added to the list of of values for the
+  key (with `+` stripped).
+
+> – All other lines are fragment text. If a fragment starts with a number of
+  `>`-s, they are stripped and used to set fragment's indentation level. If a
+  line of a fragment text starts with `|`, that character is stripped. `|` is a
+  _continuation marker_ used to continue the fragment when it would be otherwise
+  terminated (e.g., over blank lines).
+
+; code
+>This is an example of cardfile syntax.
+|The next line sets attribute KEY to the value V0
+|/ KEY V0
+|Setting an attribute does not break the fragment, our paragraph continues.
+|Next, make a card attribute LIST with a list of values:
+|// +LIST element0
+|// +LIST element1
+|
+|> This paragraph is indented.
+
+Attributes are used by the cross-referencing phase, described in detail on the
+next card.
+
+\
+
+// id attributes
+// +# trunk 3
+
+Attributes are key-value pairs attached to nodes. card uses some of the
+attributes to drive layout creation and then its rendition by the engine. Other
+attributes are useless and can be used by the user for any purpose:
+
+; code
+|/ C Attribute "C" is not used by card. So it can be used to add comments
+|/ C to the card file. All hail FORTRAN!
+
+
+The following are the most important attributes used by card:
+
+> `tags`: a list of keywords under which the card (or fragment) is indexed:
+
+; code
+>"The way to make people trust-worthy is to trust them."
+|/ +tags Hemingway
+|/ +tags platitudes
+
+> `#`
+
+> `=`
+
+> `>`
+
+> `engine` (deck): the name of the rendering engine. Currently only "html" is supported.
+
+> `name`
+
+> `label`
+
+> `dir`
+
+As part of cross-referencing, some internal attributes are used to keep
+intermediary information about deck structure and layout. The names of the
+internal attributes start with `:`:
+
+> `:processed`
+
+> `:markers`
+
+> `:#`
+
+> `:spans`
+
+> `:links`
