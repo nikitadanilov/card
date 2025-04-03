@@ -113,7 +113,7 @@ class frag(node):
         self.lines = []
         self.set(':markers', collections.defaultdict(list))
     def line_add(self, line : str):
-        self.lines += [line]
+        self.lines += [line.rstrip('\n') + ' ']
     def content(self) -> str:
         return ''.join(self.lines).strip()
     def id(self) -> str:
@@ -143,8 +143,10 @@ class para(frag):
 
 @typechecked
 class code(frag):
-    def content(self) -> str: # Do not strip the code
+    def content(self) -> str:
         return ''.join(self.lines).rstrip()
+    def line_add(self, line : str):
+        self.lines += [line] # Do not strip the code
 
 @typechecked
 class math(frag):
@@ -223,9 +225,11 @@ class deck(node):
         for l in n.join('='):
             link(self, n, l)
     def addstyles(self, n : node):
-        for s in stylenames:
-            for regex in n.join(s):
-                n.add(':spans', stylespan(regex, s))
+        # Only apply styles to paras. This should be done more generically.
+        if not isinstance(n, frag) or isinstance(n, para):
+            for s in stylenames:
+                for regex in n.join(s):
+                    n.add(':spans', stylespan(regex, s))
     def addlinks(self, n : node):
         for place in n.get(':links', list, []):
             assert place.parent != None
@@ -265,6 +269,9 @@ class deck(node):
                 self.addlinks(f)
                 self.addstyles(f)
                 cmds = frag_cmds.get(type(f), (FRAG_BEGIN, FRAG_END))
+                if f.has('>'):
+                    indent = len(f.get('>', str, ''))
+                    f.into(cmd(INDENT_BEGIN, indent), cmd(INDENT_END, indent))
                 f.into(cmd(cmds[0]), cmd(cmds[1]))
                 for s in f.get(':spans', list, []):
                     s.apply(f)
@@ -305,10 +312,17 @@ class deck(node):
                 c = card.fromfile(self, file, fd, seq)
                 f = None
             else:
-                if rawline[0] == '|':        # Continuation
-                    rawline = rawline[1:]
                 if f == None:
                     f = para(c)
+                if rawline[0] == '|':        # Continuation
+                    rawline = rawline[1:]
+                else:
+                    indent = 0
+                    while rawline[0] == '>':
+                        indent += 1
+                        rawline = rawline[1:]
+                    if indent != 0:
+                        f.set('>', indent * '>')
                 f.line_add(rawline)
         c.frag_add(f)
         self.card_add(c);
@@ -571,7 +585,8 @@ class html_eng(eng):
         self.html_card_end = (
             ' </body>\n'                                      +
             '</html>\n')
-        self.html_anchor     = '<a name="{anchor}"></a>'
+        self.html_anchor    = '<a name="{anchor}"></a>'
+        self.indent_attr    = 'style="margin-left: {indent}em;"'
         self.html_frag_pair = {
             para : ('<p{attrs}>',         '</p>'),
             code : ('<pre><code{attrs}>', '</code></pre>'),
@@ -582,31 +597,34 @@ class html_eng(eng):
             S_EMPHASIS : ('<em>',   '</em>'),
             S_ITALIC   : ('<i>',    '</i>'),
             S_BOLD     : ('<b>',    '</b>'),
+            S_UNDER    : ('<u>',    '</u>'),
             S_CODE     : ('<code class="inline">', '</code>')
         }
         self.commands = {
-            CARD_BEGIN  : html_eng.card_begin,
-            CARD_END    : html_eng.card_end,
-            FRAG_BEGIN  : html_eng.frag_begin,
-            FRAG_END    : html_eng.frag_end,
-            PARA_BEGIN  : html_eng.para_begin,
-            PARA_END    : html_eng.para_end,
-            CODE_BEGIN  : html_eng.code_begin,
-            CODE_END    : html_eng.code_end,
-            MATH_BEGIN  : html_eng.math_begin,
-            MATH_END    : html_eng.math_end,
-            LSRC_HERE   : html_eng.lsrc_here,
-            LSRC_START  : html_eng.lsrc_start,
-            LSRC_END    : html_eng.lsrc_end,
-            LTGT_HERE   : html_eng.ltgt_here,
-            LTGT_START  : html_eng.ltgt_start,
-            LTGT_END    : html_eng.ltgt_end,
-            TEXT        : html_eng.text,
-            STYLE_BEGIN : html_eng.style_begin,
-            STYLE_END   : html_eng.style_end,
-            BEGIN       : html_eng.begin,
-            END         : html_eng.end,
-            SERIES      : html_eng.series
+            CARD_BEGIN   : html_eng.card_begin,
+            CARD_END     : html_eng.card_end,
+            FRAG_BEGIN   : html_eng.frag_begin,
+            FRAG_END     : html_eng.frag_end,
+            PARA_BEGIN   : html_eng.para_begin,
+            PARA_END     : html_eng.para_end,
+            CODE_BEGIN   : html_eng.code_begin,
+            CODE_END     : html_eng.code_end,
+            MATH_BEGIN   : html_eng.math_begin,
+            MATH_END     : html_eng.math_end,
+            LSRC_HERE    : html_eng.lsrc_here,
+            LSRC_START   : html_eng.lsrc_start,
+            LSRC_END     : html_eng.lsrc_end,
+            LTGT_HERE    : html_eng.ltgt_here,
+            LTGT_START   : html_eng.ltgt_start,
+            LTGT_END     : html_eng.ltgt_end,
+            TEXT         : html_eng.text,
+            STYLE_BEGIN  : html_eng.style_begin,
+            STYLE_END    : html_eng.style_end,
+            BEGIN        : html_eng.begin,
+            END          : html_eng.end,
+            SERIES       : html_eng.series,
+            INDENT_BEGIN : html_eng.indent_begin,
+            INDENT_END   : html_eng.indent_end
         }
     def run(self, d : deck, p : List[cmd]) -> None:
         self.deck = d
@@ -617,6 +635,7 @@ class html_eng(eng):
     def card_begin(self, c : cmd, n : card, o):
         assert o == None
         self.indent += 1
+        self.frag_indent = 0
         self.fd = open(n.get(html_file, str, None), 'w')
         title = html.escape(n.get('name', str, n.get('label', str, 'Card {}'.format(n.id()))))
         self.out(self.html_card_begin.format(**{ 'title'     : title,
@@ -636,6 +655,8 @@ class html_eng(eng):
         n.set(html_anchor, anchor)
         self.indent += 1
         attrs = self.formatif(' style="{}"', '', self.style_text(n))
+        if self.frag_indent != 0:
+            attrs += ' ' + self.indent_attr.format(**{ 'indent' : 3 * self.frag_indent })
         self.outnl((self.html_anchor + \
                     self.html_frag_pair[type(n)][0]).format(**{ 'anchor'  : anchor,
                                                                 'attrs'   : attrs }))
@@ -681,6 +702,10 @@ class html_eng(eng):
         self.out(self.html_styles_pair[style][0])
     def style_end(self, c : cmd, n : node, style : int):
         self.out(self.html_styles_pair[style][1])
+    def indent_begin(self, c : cmd, n : node, indent : int):
+        self.frag_indent += indent
+    def indent_end(self, c : cmd, n : node, indent : int):
+        self.frag_indent -= indent
     def begin(self, c : cmd, n : node, o):
         assert o == None
         dir = self.deck.get('dir', str, 'html_out')
@@ -770,67 +795,73 @@ L_HERE  = 0
 L_START = 1
 L_END   = 2
 
-INVALID     =  0
-CARD_BEGIN  =  1
-CARD_END    =  2
-FRAG_BEGIN  =  3
-FRAG_END    =  4
-PARA_BEGIN  =  5
-PARA_END    =  6
-CODE_BEGIN  =  7
-CODE_END    =  8
-MATH_BEGIN  =  9
-MATH_END    = 10
-LSRC_BASE   = 11
-LSRC_HERE   = LSRC_BASE + L_HERE
-LSRC_START  = LSRC_BASE + L_START
-LSRC_END    = LSRC_BASE + L_END
-LTGT_BASE   = 15
-LTGT_HERE   = LTGT_BASE + L_HERE
-LTGT_START  = LTGT_BASE + L_START
-LTGT_END    = LTGT_BASE + L_END
-TEXT        = 18
-STYLE_BEGIN = 19
-STYLE_END   = 20
-BEGIN       = 21
-END         = 22
-SERIES      = 23
+INVALID      =  0
+CARD_BEGIN   =  1
+CARD_END     =  2
+FRAG_BEGIN   =  3
+FRAG_END     =  4
+PARA_BEGIN   =  5
+PARA_END     =  6
+CODE_BEGIN   =  7
+CODE_END     =  8
+MATH_BEGIN   =  9
+MATH_END     = 10
+LSRC_BASE    = 11
+LSRC_HERE    = LSRC_BASE + L_HERE
+LSRC_START   = LSRC_BASE + L_START
+LSRC_END     = LSRC_BASE + L_END
+LTGT_BASE    = 15
+LTGT_HERE    = LTGT_BASE + L_HERE
+LTGT_START   = LTGT_BASE + L_START
+LTGT_END     = LTGT_BASE + L_END
+TEXT         = 18
+STYLE_BEGIN  = 19
+STYLE_END    = 20
+BEGIN        = 21
+END          = 22
+SERIES       = 23
+INDENT_BEGIN = 24
+INDENT_END   = 25
 
 opnames = {
-    INVALID     : 'INVALID',
-    CARD_BEGIN  : 'CARD_BEGIN',
-    CARD_END    : 'CARD_END',
-    FRAG_BEGIN  : 'FRAG_BEGIN',
-    FRAG_END    : 'FRAG_END',
-    PARA_BEGIN  : 'PARA_BEGIN',
-    PARA_END    : 'PARA_END',
-    CODE_BEGIN  : 'CODE_BEGIN',
-    CODE_END    : 'CODE_END',
-    MATH_BEGIN  : 'MATH_BEGIN',
-    MATH_END    : 'MATH_END',
-    LSRC_HERE   : 'LSRC_HERE',
-    LSRC_START  : 'LSRC_START',
-    LSRC_END    : 'LSRC_END',
-    LTGT_HERE   : 'LTGT_HERE',
-    LTGT_START  : 'LTGT_START',
-    LTGT_END    : 'LTGT_END',
-    TEXT        : 'TEXT',
-    STYLE_BEGIN : 'STYLE_BEGIN',
-    STYLE_END   : 'STYLE_END',
-    BEGIN       : 'BEGIN',
-    END         : 'END',
-    SERIES      : 'SERIES'
+    INVALID      : 'INVALID',
+    CARD_BEGIN   : 'CARD_BEGIN',
+    CARD_END     : 'CARD_END',
+    FRAG_BEGIN   : 'FRAG_BEGIN',
+    FRAG_END     : 'FRAG_END',
+    PARA_BEGIN   : 'PARA_BEGIN',
+    PARA_END     : 'PARA_END',
+    CODE_BEGIN   : 'CODE_BEGIN',
+    CODE_END     : 'CODE_END',
+    MATH_BEGIN   : 'MATH_BEGIN',
+    MATH_END     : 'MATH_END',
+    LSRC_HERE    : 'LSRC_HERE',
+    LSRC_START   : 'LSRC_START',
+    LSRC_END     : 'LSRC_END',
+    LTGT_HERE    : 'LTGT_HERE',
+    LTGT_START   : 'LTGT_START',
+    LTGT_END     : 'LTGT_END',
+    TEXT         : 'TEXT',
+    STYLE_BEGIN  : 'STYLE_BEGIN',
+    STYLE_END    : 'STYLE_END',
+    BEGIN        : 'BEGIN',
+    END          : 'END',
+    SERIES       : 'SERIES',
+    INDENT_BEGIN : 'INDENT_BEGIN',
+    INDENT_END   : 'INDENT_END'
 }
 
 S_EMPHASIS = 1
 S_ITALIC   = 2
 S_BOLD     = 3
 S_CODE     = 4
+S_UNDER    = 5
 
 stylenames = {
     'em' : S_EMPHASIS,
     'it' : S_ITALIC,
     'bd' : S_BOLD,
+    'un' : S_UNDER,
     'cd' : S_CODE
 }
 
