@@ -117,7 +117,7 @@ class frag(node):
     def content(self) -> str:
         return ''.join(self.lines).strip()
     def id(self) -> str:
-        return self.makeseq(self.parent.id())
+        return (self.parent.id() + "-" + self.get('id')) if self.has('id') else self.makeseq(self.parent.id())
     def cut(self):
         """Split the processed content into text segments separated by marker commands."""
         text = self.get(':processed', str, self.content())
@@ -449,7 +449,7 @@ class span_place(place):
                     newlink.tgt = copy
                 else:
                     newlink.src = copy
-            oldlink = newlink
+                oldlink = newlink
             return (s, m.end(), [],
                     [(m.start(), cmd(self.place.base + L_START, oldlink))],
                     [(m.end(),   cmd(self.place.base + L_END,   oldlink))])
