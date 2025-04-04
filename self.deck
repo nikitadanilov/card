@@ -160,7 +160,7 @@ of a line determines the parser state transition.
 
 > – A line starting with `///` is a deck attribute. A line starting with a `//` is
   a card attribute and a line starting with `/` is a fragment attribute. All
-  attributes have the same syntax: the key and the value separates by spaces. If
+  attributes have the same syntax: the key and the value separated by spaces. If
   the key starts with `+`, the value is added to the list of of values for the
   key (with `+` stripped).
 
@@ -180,6 +180,8 @@ of a line determines the parser state transition.
 |// +LIST element1
 |
 |> This paragraph is indented.
+||
+|The indented paragraph continues.
 
 Attributes are used by the cross-referencing phase, described in detail on the
 next card.
@@ -191,7 +193,8 @@ next card.
 
 Attributes are key-value pairs attached to nodes. card uses some of the
 attributes to drive layout creation and then its rendition by the engine. Other
-attributes are useless and can be used by the user for any purpose:
+attributes can be used by the user for any purpose:
+/ id attrs
 
 ; code
 |/ C Attribute "C" is not used by card. So it can be used to add comments
@@ -199,6 +202,8 @@ attributes are useless and can be used by the user for any purpose:
 
 
 The following are the most important attributes used by card:
+/ += . "following" -> !attributes-attrs "be used"
+/ += . "following" -> !attributes-attrs "can be"
 
 > `tags`: a list of keywords under which the card (or fragment) is indexed:
 
@@ -224,6 +229,9 @@ The following are the most important attributes used by card:
 As part of cross-referencing, some internal attributes are used to keep
 intermediary information about deck structure and layout. The names of the
 internal attributes start with `:`:
+/ +* "part of" Interesting!
+/ +* "some internal attributes" They call them internal for a good reason: they are not external!
+/ +* "`:`" More marginalia just for the sake of it.
 
 > `:processed`
 
