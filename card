@@ -85,6 +85,8 @@ class node:
         return sum([x.get(attr, list, []) for x in self.ancestry()], [])
     def deck(self):
         return self.ancestry()[-1]
+    def brief(self, nr : int) -> str:
+        return (self.get('brief') if self.has('brief') else self.content())[0:nr]
     def makeseq(self, base : str) -> str: # Need 'int' on the next line!
         return (base + '-' + '{:05}'.format(self.get('seq', int, None))).replace(' ', '-')
     def indent(self, n : int, lines) -> List[str]:
@@ -179,6 +181,8 @@ class card(node):
         c.set('mtime', datetime.datetime.fromtimestamp(stats.st_mtime))
         c.set('ctime', datetime.datetime.fromtimestamp(stats.st_ctime))
         return c
+    def content(self) -> str:
+        return ' '.join([frag.content() for frag in self.frags])
     def program(self):
         return self.incmd + sum([f.program() for f in self.frags], []) + self.excmd
     def tostring(self) -> List[str]:
@@ -236,14 +240,6 @@ class deck(node):
         for place in n.get(':links', list, []):
             assert place.parent != None
             n.cadd(cmd(place.parent.base(n) + L_HERE, place.parent))
-        nidx = 0
-        notes = n.get(':notes', list, [])
-        for x in notes:
-            x.idx = nidx
-            nidx += 1
-            n.cadd(cmd(NOTE_HERE, x))
-            if nidx == len(notes):
-                x.last = True
     def addseries(self, c : card):
         for (trunk, zahl) in c.get(':#', list, []):
             sequence = list(self.series[trunk])
@@ -422,7 +418,7 @@ class place:
 
 @typechecked
 class url_place(place):
-    def __init__(self, parent : link, url : str):
+    def __init__(self, parent : Optional[link], url : str):
         self.url  = url
         self.node = None
         self.parent = parent
@@ -594,7 +590,6 @@ html_style_file = 'html.style.file'
 @typechecked
 class html_eng(eng):
     def __init__(self):
-        self.series = {}
         self.html_card_begin = (
             '<!DOCTYPE html>\n'                               + 
             '<html>\n'                                        +
@@ -640,11 +635,12 @@ class html_eng(eng):
             '    margin-left: 20%;\n' +
             '}\n' +
             '.margin {\n' +
-            '    margin-right: -150px;\n' +
-            '    margin-left: 20px;\n' +
-            '    max-width: 145px;\n' +
+            '    margin-right: -32%;\n' +
+            '    margin-left: 2%;\n' +
+            '    max-width: 30%;\n' +
             '    margin-top: 0;\n' +
-            '    font-size: 70%;\n' +
+            '    font-size: 80%;\n' +
+            '    text-align: left;\n' +
             '    float: right;\n' +
             '}\n' +
             '\n')
@@ -680,19 +676,29 @@ class html_eng(eng):
     def run(self, d : deck, p : List[cmd]) -> None:
         self.deck = d
         for c in p:
+            self.preprocess(c)
+        for c in p:
             self.exec(c)
+    def preprocess(self, c : cmd):
+        opc  = c.opc
+        node = c.node
+        obj  = c.obj
+        if opc == NOTE_START:
+            node.add(':html-note', obj)
     def exec(self, c : cmd):
         self.commands[c.opc](self, c, c.node, c.obj)
+    def file_begin(self, title : str, style : str, anchor : str):
+        self.out(self.html_card_begin.format(**{ 'title'     : title,
+                                                 'stylefile' : self.style_file,
+                                                 'style'     : style,
+                                                 'anchor'    : anchor }))
     def card_begin(self, c : cmd, n : card, o):
         assert o == None
         self.indent += 1
         self.frag_indent = 0
         self.fd = open(n.get(html_file, str, None), 'w')
         title = html.escape(n.get('name', str, n.get('label', str, 'Card {}'.format(n.id()))))
-        self.out(self.html_card_begin.format(**{ 'title'     : title,
-                                                 'stylefile' : self.style_file,
-                                                 'style'     : self.style_text(n),
-                                                 'anchor'    : n.get(html_anchor, str, None) }))
+        self.file_begin(title, self.style_text(n), n.get(html_anchor, str, None))
         self.out('<div class="column">')
     def card_end(self, c : cmd, n : card, o):
         assert o == None
@@ -707,6 +713,16 @@ class html_eng(eng):
         anchor = html.escape(n.get(html_anchor, str, n.id()))
         n.set(html_anchor, anchor)
         self.indent += 1
+        nidx = 0
+        if n.has(':html-note'):
+            self.out('<p class="margin">')
+            for x in n.get(':html-note', list, []):
+                x.idx = nidx
+                self.out('<span class="annotation" data-uid="{}">'.format(nidx % 4))
+                self.text(c, n, x.text)
+                self.out('</span><br>')
+                nidx += 1
+            self.out('</p>')
         attrs = self.formatif(' style="{}"', '', self.style_text(n))
         if self.frag_indent != 0:
             attrs += ' ' + self.indent_attr.format(**{ 'indent' : 3 * self.frag_indent })
@@ -750,13 +766,7 @@ class html_eng(eng):
     def ltgt_end(self, c : cmd, n : node, o : link):
         self.out('</span>')
     def note_here(self, c : cmd, n : node, o : note):
-        if o.idx == 0:
-            self.out('<p class="margin">')
-        self.out('<span class="annotation" data-uid="{}">'.format(o.idx % 4))
-        self.text(c, n, o.text)
-        self.out('</span><br>')
-        if o.last:
-            self.out('</p>')
+        pass
     def note_start(self, c : cmd, n : node, o : note):
         self.out('<span class="annotation" data-uid="{}">'.format(o.idx % 4))
     def note_end(self, c : cmd, n : node, o : note):
@@ -778,35 +788,42 @@ class html_eng(eng):
         os.chdir(dir)
         self.style_build()
         self.prep()
+        self.series_index()
         self.indent = 0
     def end(self, c : cmd, n : node, o):
         assert self.indent == 0
-        self.backmatter()
-        self.index()
-        for s in self.series:
-            self.series_build(s)
         os.chdir('..')
     def series(self, c : cmd, n : card, o : Tuple[str, Optional[card], Optional[card]]) -> None:
         if c.datum == None:
             c.datum = True
             n.add(':html-delay', c)
+            n.series_nr = getattr(n, 'series_nr', 0) + 1
+            n.series_done = 0
             return
         trunk = o[0]
         prev  = o[1]
         next  = o[2]
-        self.out('<p>')
+        if n.series_done == 0:
+            self.out('<p>')
         if prev != None:
             self.href_start(n, node_place(None, prev))
         self.text(c, n, '<')
         if prev != None:
             self.href_end()
-        self.text(c, n, ' ' + trunk + ' ')
+        self.out('&nbsp;')
+        self.href_start(n, url_place(None, self.series_file(trunk)))
+        self.text(c, n, trunk)
+        self.href_end()
+        self.out('&nbsp;')
         if next != None:
             self.href_start(n, node_place(None, next))
         self.text(c, n, '>')
         if next != None:
             self.href_end()
-        self.out('</p>')
+        self.out('&nbsp;&nbsp;&nbsp;')
+        n.series_done += 1
+        if n.series_done == n.series_nr:
+            self.out('</p>')
         
     def prep(self): # Build all filenames and anchors.
         for c in self.deck.cards:
@@ -816,7 +833,28 @@ class html_eng(eng):
             for f in c.frags:
                 f.set(html_file, file)
                 f.set(html_anchor, html.escape(f.get(html_anchor, str, f.id())))
-        self.frontmatter()
+    def series_file(self, trunk : str) -> str:
+        return 'series_' + trunk + '.html'
+    def series_index(self) -> None:
+        for trunk in self.deck.series:
+            self.fd = open(self.series_file(trunk), 'w')
+            self.file_begin('Series ' + trunk, '', '')
+            self.series_trunk(trunk)
+            self.out(self.html_card_end)
+            self.fd.close()
+    def series_trunk(self, trunk : str) -> None:
+        sequence = list(self.deck.series[trunk])
+        sequence.sort()
+        for zahl in sequence:
+            node = self.deck.series[trunk][zahl]
+            self.out('<p>')
+            self.out(self.html_href_pair[0].format(**{ 'ref' : node.get(html_file) + '#' + node.get(html_anchor) }))
+            self.out(html.escape(zahl))
+            self.out(self.html_href_pair[1])
+            self.out('&nbsp; : &nbsp; ')
+            self.out(html.escape(node.brief(140) + ' ...'))
+            self.out('</p>')
+        
     def href_start(self, fr : node, p : place):
         if isinstance(p, url_place):
             ref = p.url
@@ -828,14 +866,6 @@ class html_eng(eng):
         self.out(self.html_href_pair[1])
     def formatif(self, notempty : str, empty : str, s : str):
         return empty if s == '' else notempty.format(s)
-    def frontmatter(self) -> None:
-        pass
-    def backmatter(self) -> None:
-        pass
-    def index(self) -> None:
-        pass
-    def series_build(self, s):
-        pass
     def outnl(self, content : str):
         self.out('\n' + self.indent * 8 * ' ' + content)
     def out(self, content : str):
