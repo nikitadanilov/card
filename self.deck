@@ -1,7 +1,6 @@
 // C card self-documentation deck
 // id index
 // +# trunk 0
-// +# series 1
 This is the documentation for the card tool.
 / += . "card" -> https://github.com/nikitadanilov/card
 
@@ -190,7 +189,6 @@ next card.
 
 // id attributes
 // +# trunk 3
-// +# series 0
 
 Attributes are key-value pairs attached to nodes. card uses some of the
 attributes to drive layout creation and then its rendition by the engine. Other
