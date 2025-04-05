@@ -1,5 +1,5 @@
 // C card self-documentation deck
-// id intro
+// id index
 // +# trunk 0
 // +# series 1
 This is the documentation for the card tool.
@@ -146,7 +146,6 @@ of a line determines the parser state transition.
 |; para
 |The previous fragment was a block display of code with an embedded link. This
 |fragment is a text paragraph.
-/ += . "EVCOMB(?=:)" -> https://dl.acm.org/doi/pdf/10.1145/359024.359031
 
 > If the fragment type is not specified, the next fragment will be a paragraph.
 
@@ -204,43 +203,65 @@ attributes can be used by the user for any purpose:
 
 
 The following are the most important attributes used by card:
-/ += . "following" -> !attributes-attrs "be used"
-/ += . "following" -> !attributes-attrs "can be"
 
 > `tags`: a list of keywords under which the card (or fragment) is indexed:
 
 ; code
->"The way to make people trust-worthy is to trust them."
+>>"The way to make people trust-worthy is to trust them."
 |/ +tags Hemingway
 |/ +tags platitudes
 
-> `#`
+> `#`: specifies the position of the card in a series:
 
-> `=`
+; code
+>>\
+Card Number Three
+|// +# trunk 3
+|// +# chrono 2025/04/01
 
-> `>`
+>> Attributes above place "Card Three" in the position "3" in "trunk" series and
+  in position "2025/04/01" in "chrono" series. Cards within a series are ordered
+  by their positions lexicographically as strings. The header and the footer of
+  a card links it to the previous and the following cards in each series the
+  card belongs to. For each series HTML engine generates at index file, listing
+  all the cards in the series.
 
-> `engine` (deck): the name of the rendering engine. Currently only "html" is supported.
+> `=`: adds a link. A link attribute value has the following grammar:
 
-> `name`
+; code
+>>LINK           ::= SOURCE '->' TARGET
+SOURCE, TARGET ::= URL | DECK_LOCATION
+DECK_LOCATION  ::= NODE [SPAN]
+NODE           ::= '.' | '!' IDENTIFIER
+SPAN           ::= '"' REGEX '"'
 
-> `label`
+>>`.` refers to the current fragment. `! IDENTIFER` refers to the fragment with
+ the given identifier. Examples:
 
-> `dir`
+; code
+>>\
+|
+|// id CARD0
+|
+|Add a link to a web-page here ...
+|/ id PARA0
+|/ += . "here" -> https://www.example.com
+|
+|Another paragraph. Link _to_ it from a particular text in the previous paragraph. 
+|/ += CARD0-PARA0 "a link" -> . "Link"
 
-As part of cross-referencing, some internal attributes are used to keep
-intermediary information about deck structure and layout. The names of the
-internal attributes start with `:`:
-/ +* "part of" Interesting!
-/ +* "some internal attributes" They call them internal for a good reason: they are not external!
-/ +* "`:`" More marginalia just for the sake of it.
+>>When a fragment is the source of a link (i.e., when it is on the left-hand side
+ of `->`), HTML engine inserts `A HREF` as needed, like here. If a fragment is the target
+ of a link, this is mentioned in a automatically inserted marginalia.
+/ += . "here" -> https://www.example.com
 
-> `:processed`
+>`*`: adds a note. HTML renders notes on the right margin. Example:
 
-> `:markers`
+; code
+>>This paragraph talks about one thing and then another thing.
+|/ +* "one thing" Also described in the next paragraph
+|/ +* "another thing" Which is actually a generalisation of the one thing.
 
-> `:#`
-
-> `:spans`
-
-> `:links`
+>>The result looks like this: This paragraph talks about one thing and then another thing.
+/ +* "one thing" Also described in the next paragraph
+/ +* "another thing" Which is actually a generalisation of the one thing.
