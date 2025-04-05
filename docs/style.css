@@ -1,0 +1,62 @@
+span.annotation { border-bottom: 2px solid; }
+span.annotation span.annotation { padding-bottom:2px; }
+span.annotation span.annotation span.annotation { padding-bottom:4px; }
+span.annotation span.annotation span.annotation span.annotation { padding-bottom:6px; }
+span[data-uid="0"] { border-color:orange; }
+span[data-uid="1"] { border-color:blue; }
+span[data-uid="2"] { border-color:red; }
+span[data-uid="3"] { border-color:green; }
+
+.column {
+    max-width: 60%;
+    margin-right: 20%;
+    margin-left: 20%;
+}
+.margin {
+    margin-right: -32%;
+    margin-left: 2%;
+    max-width: 30%;
+    margin-top: 0;
+    font-size: 80%;
+    text-align: left;
+    float: right;
+}
+
+
+p         { text-align: justify; }
+p         { font-size: 20px; font-family: "F1785 GLC Baskerville Normal", Menlo, Consolas, Monaco }
+a         { color: #2288bb; text-decoration:underline; }
+a:visited { color: #888888; }
+a:hover   { color: white; background-color: #33aaff; text-decoration:underline; }
+code      {
+font-family: Menlo, Consolas, Monaco, Liberation Mono, Lucida Console, monospace;
+font-size: 0.95em;
+background-color: #f7f7f7;
+color: #333;
+overflow-x: auto;
+white-space: pre;
+}
+@font-face {
+font-family: "F1785 GLC Baskerville Normal";
+src: url("https://db.onlinewebfonts.com/t/e9f7c9e5bb2ce4999d74663e6b23f860.eot");
+src: url("https://db.onlinewebfonts.com/t/e9f7c9e5bb2ce4999d74663e6b23f860.eot?#iefix")format("embedded-opentype"),
+url("https://db.onlinewebfonts.com/t/e9f7c9e5bb2ce4999d74663e6b23f860.woff2")format("woff2"),
+url("https://db.onlinewebfonts.com/t/e9f7c9e5bb2ce4999d74663e6b23f860.woff")format("woff"),
+url("https://db.onlinewebfonts.com/t/e9f7c9e5bb2ce4999d74663e6b23f860.ttf")format("truetype"),
+url("https://db.onlinewebfonts.com/t/e9f7c9e5bb2ce4999d74663e6b23f860.svg#F1785 GLC Baskerville Normal")format("svg");
+}
+code.inline { display: inline; background-color: #ebebeb; font-size: 0.75em; }
+pre code  {
+display: block;
+padding: 1em;
+margin: 1em 0;
+border-left: 8px solid #ddd;
+border-radius: 8px;
+line-height: 1.5;
+}
+body {
+max-width: max-content;
+margin: auto;
+}
+span.linktarget       { color: #2288bb; }
+span.linktarget:hover { color: white; background-color: #33aaff; }
