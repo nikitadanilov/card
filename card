@@ -873,7 +873,6 @@ class html_eng(eng):
         self.fd.close()
     def card_render_series(self, d : deck, c : card):
         if len(c.series) > 0:
-            self.out('<p>')
             for (trunk, prev, next) in c.series:
                 if prev != None:
                     self.href_start(c, node_place(None, prev))
@@ -891,7 +890,6 @@ class html_eng(eng):
                 if next != None:
                     self.href_end()
                 self.out('&nbsp;&nbsp;&nbsp;')
-            self.out('</p>')
     def frag_render_begin(self, d : deck, c : card, f : frag):
         if f.has(':html-note'):
             self.out('<p class="margin">')
