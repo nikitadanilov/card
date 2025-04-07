@@ -861,8 +861,13 @@ class html_eng(eng):
         title = html.escape(c.get('name', str, c.get('label', str, 'Card {}'.format(c.id()))))
         self.file_begin(title, self.style_text(c), c.get(html_anchor, str, None))
         self.out('<div class="column">')
+        self.out('<header>')
+        self.out(title)
+        self.out('</header>')
     def card_render_end(self, d : deck, c : card):
+        self.out('<footer>')
         self.card_render_series(d, c)
+        self.out('</footer>')
         self.out('</div>')
         self.outnl(self.html_card_end)
         self.fd.close()

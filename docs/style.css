@@ -60,3 +60,17 @@ margin: auto;
 }
 span.linktarget       { color: #2288bb; }
 span.linktarget:hover { color: white; background-color: #33aaff; }
+header {
+background-color: #ebebeb;
+padding: 20px;
+border-radius: 15px 15px 0 0; /* top-left, top-right, bottom-right, bottom-left */
+font-size: 30px; font-family: "F1785 GLC Baskerville Normal", Menlo, Consolas, Monaco
+margin-top: 60px;
+}
+footer {
+background-color: #ebebeb;
+padding: 20px;
+border-radius: 0 0 15px 15px; /* top-left, top-right, bottom-right, bottom-left */
+font-size: 30px; font-family: "F1785 GLC Baskerville Normal", Menlo, Consolas, Monaco
+margin-bottom: 60px;
+}
