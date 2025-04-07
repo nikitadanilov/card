@@ -221,7 +221,7 @@ Card Number Three
   in position "2025/04/01" in "chrono" series. Cards within a series are ordered
   by their positions lexicographically as strings. The header and the footer of
   a card links it to the previous and the following cards in each series the
-  card belongs to. For each series HTML engine generates at index file, listing
+  card belongs to. For each series HTML engine generates an index file, listing
   all the cards in the series.
 
 > `=`: adds a link. A link attribute value has the following grammar:

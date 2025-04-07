@@ -621,13 +621,9 @@ class html_eng(eng):
         }
         self.html_style_internal = (
             'span.annotation { border-bottom: 2px solid; }\n'                  +
-            'span.annotation span.annotation { padding-bottom:2px; }\n'       +
-            'span.annotation span.annotation span.annotation { padding-bottom:4px; }\n' +
-            'span.annotation span.annotation span.annotation span.annotation { padding-bottom:6px; }\n' +
-            'span[data-uid="0"] { border-color:orange; }\n' +
-            'span[data-uid="1"] { border-color:blue; }\n' +
-            'span[data-uid="2"] { border-color:red; }\n' +
-            'span[data-uid="3"] { border-color:green; }\n' +
+            'span.annotation span.annotation { padding-bottom:4px; }\n'       +
+            'span.annotation span.annotation span.annotation { padding-bottom:6px; }\n' +
+            'span.annotation span.annotation span.annotation span.annotation { padding-bottom:8px; }\n' +
             '\n' +
             '.column {\n' +
             '    max-width: 60%;\n' +
@@ -644,6 +640,8 @@ class html_eng(eng):
             '    float: right;\n' +
             '}\n' +
             '\n')
+        self.html_note_colours = [ 'orange', 'blue', 'red', 'green' ]
+        self.html_note_span = 'span[data-uid="{uid}"] {{ border-color: {colour}; }}'
         self.commands = {
             CARD_BEGIN   : html_eng.card_begin,
             CARD_END     : html_eng.card_end,
@@ -655,6 +653,25 @@ class html_eng(eng):
             CODE_END     : html_eng.code_end,
             MATH_BEGIN   : html_eng.math_begin,
             MATH_END     : html_eng.math_end,
+            LSRC_HERE    : html_eng.forward,
+            LSRC_START   : html_eng.forward,
+            LSRC_END     : html_eng.forward,
+            LTGT_HERE    : html_eng.forward,
+            LTGT_START   : html_eng.forward,
+            LTGT_END     : html_eng.forward,
+            TEXT         : html_eng.forward,
+            STYLE_BEGIN  : html_eng.forward,
+            STYLE_END    : html_eng.forward,
+            BEGIN        : html_eng.begin,
+            END          : html_eng.end,
+            SERIES       : html_eng.series,
+            INDENT_BEGIN : html_eng.indent_begin,
+            INDENT_END   : html_eng.indent_end,
+            NOTE_HERE    : html_eng.forward,
+            NOTE_START   : html_eng.note_start,
+            NOTE_END     : html_eng.forward
+        }
+        self.render_commands = {
             LSRC_HERE    : html_eng.lsrc_here,
             LSRC_START   : html_eng.lsrc_start,
             LSRC_END     : html_eng.lsrc_end,
@@ -664,27 +681,15 @@ class html_eng(eng):
             TEXT         : html_eng.text,
             STYLE_BEGIN  : html_eng.style_begin,
             STYLE_END    : html_eng.style_end,
-            BEGIN        : html_eng.begin,
-            END          : html_eng.end,
-            SERIES       : html_eng.series,
-            INDENT_BEGIN : html_eng.indent_begin,
-            INDENT_END   : html_eng.indent_end,
             NOTE_HERE    : html_eng.note_here,
-            NOTE_START   : html_eng.note_start,
+            NOTE_START   : html_eng.note_start_render,
             NOTE_END     : html_eng.note_end
         }
     def run(self, d : deck, p : List[cmd]) -> None:
         self.deck = d
         for c in p:
-            self.preprocess(c)
-        for c in p:
             self.exec(c)
-    def preprocess(self, c : cmd):
-        opc  = c.opc
-        node = c.node
-        obj  = c.obj
-        if opc == NOTE_START:
-            node.add(':html-note', obj)
+        self.render()
     def exec(self, c : cmd):
         self.commands[c.opc](self, c, c.node, c.obj)
     def file_begin(self, title : str, style : str, anchor : str):
@@ -696,42 +701,18 @@ class html_eng(eng):
         assert o == None
         self.indent += 1
         self.frag_indent = 0
-        self.fd = open(n.get(html_file, str, None), 'w')
-        title = html.escape(n.get('name', str, n.get('label', str, 'Card {}'.format(n.id()))))
-        self.file_begin(title, self.style_text(n), n.get(html_anchor, str, None))
-        self.out('<div class="column">')
+        n.series = []
     def card_end(self, c : cmd, n : card, o):
         assert o == None
-        for c in n.get(':html-delay', list, []):
-            self.exec(c)
-        self.out('</div>')
-        self.outnl(self.html_card_end)
-        self.fd.close()
         self.indent -= 1
     def frag_begin(self, c : cmd, n : frag, o):
         assert o == None
-        anchor = html.escape(n.get(html_anchor, str, n.id()))
-        n.set(html_anchor, anchor)
         self.indent += 1
-        nidx = 0
-        if n.has(':html-note'):
-            self.out('<p class="margin">')
-            for x in n.get(':html-note', list, []):
-                x.idx = nidx
-                self.out('<span class="annotation" data-uid="{}">'.format(nidx % 4))
-                self.text(c, n, x.text)
-                self.out('</span><br>')
-                nidx += 1
-            self.out('</p>')
-        attrs = self.formatif(' style="{}"', '', self.style_text(n))
-        if self.frag_indent != 0:
-            attrs += ' ' + self.indent_attr.format(**{ 'indent' : 3 * self.frag_indent })
-        self.outnl((self.html_anchor + \
-                    self.html_frag_pair[type(n)][0]).format(**{ 'anchor'  : anchor,
-                                                                'attrs'   : attrs }))
+        n.note_idx = 0
+        n.html_cmds = []
+        n.frag_indent = 0
     def frag_end(self, c : cmd, n : frag, o):
         assert o == None
-        self.out(self.html_frag_pair[type(n)][1])
         self.indent -= 1
     def para_begin(self, c : cmd, n : para, o):
         self.frag_begin(c, n, o)
@@ -745,6 +726,8 @@ class html_eng(eng):
         self.frag_begin(c, n, o)
     def math_end(self, c : cmd, n : math, o):
         self.frag_end(c, n, o)
+    def forward(self, c : cmd, f : frag, o):
+        f.html_cmds += [c]
     def lsrc_here(self, c : cmd, n : node, o : link):
         self.text(c, n, ' [')
         self.href_start(n, o.tgt)
@@ -768,7 +751,12 @@ class html_eng(eng):
     def note_here(self, c : cmd, n : node, o : note):
         pass
     def note_start(self, c : cmd, n : node, o : note):
-        self.out('<span class="annotation" data-uid="{}">'.format(o.idx % 4))
+        o.idx = n.note_idx
+        n.note_idx += 1
+        n.add(':html-note', o)
+        self.forward(c, n, o)
+    def note_start_render(self, c : cmd, n : node, o : note):
+        self.out('<span class="annotation" data-uid="{}">'.format(o.idx % len(self.html_note_colours)))
     def note_end(self, c : cmd, n : node, o : note):
         self.out('</span>')
     def text(self, c : cmd, n : node, o : str):
@@ -779,52 +767,17 @@ class html_eng(eng):
         self.out(self.html_styles_pair[style][1])
     def indent_begin(self, c : cmd, n : node, indent : int):
         self.frag_indent += indent
+        n.frag_indent = self.frag_indent
     def indent_end(self, c : cmd, n : node, indent : int):
         self.frag_indent -= indent
     def begin(self, c : cmd, n : node, o):
         assert o == None
-        dir = self.deck.get('dir', str, 'html_out')
-        os.mkdir(dir)
-        os.chdir(dir)
-        self.style_build()
         self.prep()
-        self.series_index()
         self.indent = 0
     def end(self, c : cmd, n : node, o):
         assert self.indent == 0
-        os.chdir('..')
     def series(self, c : cmd, n : card, o : Tuple[str, Optional[card], Optional[card]]) -> None:
-        if c.datum == None:
-            c.datum = True
-            n.add(':html-delay', c)
-            n.series_nr = getattr(n, 'series_nr', 0) + 1
-            n.series_done = 0
-            return
-        trunk = o[0]
-        prev  = o[1]
-        next  = o[2]
-        if n.series_done == 0:
-            self.out('<p>')
-        if prev != None:
-            self.href_start(n, node_place(None, prev))
-        self.text(c, n, '<')
-        if prev != None:
-            self.href_end()
-        self.out('&nbsp;')
-        self.href_start(n, url_place(None, self.series_file(trunk)))
-        self.text(c, n, trunk)
-        self.href_end()
-        self.out('&nbsp;')
-        if next != None:
-            self.href_start(n, node_place(None, next))
-        self.text(c, n, '>')
-        if next != None:
-            self.href_end()
-        self.out('&nbsp;&nbsp;&nbsp;')
-        n.series_done += 1
-        if n.series_done == n.series_nr:
-            self.out('</p>')
-        
+        n.series += [o]
     def prep(self): # Build all filenames and anchors.
         for c in self.deck.cards:
             file = c.get(html_file, str, c.id() + '.html')
@@ -876,13 +829,87 @@ class html_eng(eng):
         self.style_file = self.deck.get(html_style_file, str, 'style.css')
         with open(self.style_file, 'w') as fd:
             fd.write(self.html_style_internal + '\n')
+            for i in range(0, len(self.html_note_colours)):
+                fd.write(self.html_note_span.format(** { 'uid'    : i,
+                                                         'colour' : self.html_note_colours[i] }) + '\n')
             fd.write(self.style_text(self.deck) + '\n')
     def href(self, fr : node, to : node):
         h = '#' + to.get(html_anchor)
         if fr.get(html_file) != to.get(html_file):
             h = to.get(html_file) + h
         return h
-            
+    def render(self):
+        self.deck_render_begin(self.deck)
+        for c in self.deck.cards:
+            self.card_render_begin(self.deck, c)
+            for f in c.frags:
+                self.frag_render_begin(self.deck, c, f)
+                self.frag_render_content(self.deck, c, f)
+                self.frag_render_end(self.deck, c, f)
+            self.card_render_end(self.deck, c)
+        self.series_index()
+        self.deck_render_end(self.deck)
+    def deck_render_begin(self, d : deck):
+        dir = self.deck.get('dir', str, 'html_out')
+        os.mkdir(dir)
+        os.chdir(dir)
+        self.style_build()
+    def deck_render_end(self, d : deck):
+        os.chdir('..')
+    def card_render_begin(self, d : deck, c : card):
+        self.fd = open(c.get(html_file, str, None), 'w')
+        title = html.escape(c.get('name', str, c.get('label', str, 'Card {}'.format(c.id()))))
+        self.file_begin(title, self.style_text(c), c.get(html_anchor, str, None))
+        self.out('<div class="column">')
+    def card_render_end(self, d : deck, c : card):
+        self.card_render_series(d, c)
+        self.out('</div>')
+        self.outnl(self.html_card_end)
+        self.fd.close()
+    def card_render_series(self, d : deck, c : card):
+        if len(c.series) > 0:
+            self.out('<p>')
+            for (trunk, prev, next) in c.series:
+                if prev != None:
+                    self.href_start(c, node_place(None, prev))
+                self.render_text('<')
+                if prev != None:
+                    self.href_end()
+                self.out('&nbsp;')
+                self.href_start(c, url_place(None, self.series_file(trunk)))
+                self.render_text(trunk)
+                self.href_end()
+                self.out('&nbsp;')
+                if next != None:
+                    self.href_start(c, node_place(None, next))
+                self.render_text('>')
+                if next != None:
+                    self.href_end()
+                self.out('&nbsp;&nbsp;&nbsp;')
+            self.out('</p>')
+    def frag_render_begin(self, d : deck, c : card, f : frag):
+        if f.has(':html-note'):
+            self.out('<p class="margin">')
+            for m in f.get(':html-note', list, []):
+                self.out('<span class="annotation" data-uid="{}">'.format(m.idx % len(self.html_note_colours)))
+                self.render_text(m.text)
+                self.out('</span><br>')
+            self.out('</p>')
+        attrs = self.formatif(' style="{}"', '', self.style_text(f))
+        if f.frag_indent != 0:
+            attrs += ' ' + self.indent_attr.format(**{ 'indent' : 3 * f.frag_indent })
+        self.outnl((self.html_anchor + \
+                    self.html_frag_pair[type(f)][0]).format(**{ 'anchor'  : f.get(html_anchor),
+                                                                'attrs'   : attrs }))
+        pass
+    def frag_render_content(self, d : deck, c : card, f : frag):
+        for c in f.html_cmds:
+            self.render_commands[c.opc](self, c, c.node, c.obj)
+    def frag_render_end(self, d : deck, c : card, f : frag):
+        self.out(self.html_frag_pair[type(f)][1])
+    def render_text(self, s : str):
+        self.out(html.escape(s))
+        
 engines = {
     'html' : html_eng
 }

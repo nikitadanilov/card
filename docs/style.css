@@ -1,11 +1,7 @@
 span.annotation { border-bottom: 2px solid; }
-span.annotation span.annotation { padding-bottom:2px; }
-span.annotation span.annotation span.annotation { padding-bottom:4px; }
-span.annotation span.annotation span.annotation span.annotation { padding-bottom:6px; }
-span[data-uid="0"] { border-color:orange; }
-span[data-uid="1"] { border-color:blue; }
-span[data-uid="2"] { border-color:red; }
-span[data-uid="3"] { border-color:green; }
+span.annotation span.annotation { padding-bottom:4px; }
+span.annotation span.annotation span.annotation { padding-bottom:6px; }
+span.annotation span.annotation span.annotation span.annotation { padding-bottom:8px; }
 
 .column {
     max-width: 60%;
@@ -23,6 +19,10 @@ span[data-uid="3"] { border-color:green; }
 }
 
 
+span[data-uid="0"] { border-color: orange; }
+span[data-uid="1"] { border-color: blue; }
+span[data-uid="2"] { border-color: red; }
+span[data-uid="3"] { border-color: green; }
 p         { text-align: justify; }
 p         { font-size: 20px; font-family: "F1785 GLC Baskerville Normal", Menlo, Consolas, Monaco }
 a         { color: #2288bb; text-decoration:underline; }
