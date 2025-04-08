@@ -77,6 +77,7 @@ Deck processing happens in the following phases:
  str.split() and str.strip() calls. The main parser's logic is in
  card.cardread() function. (Fun fact: the hyperlinks to the functions in the
  preceding sentences are generated automatically.) A cardfile consists of:
+/ id syntax
 
 >>       – the formatting instruction indicating the boundaries between fragments and cards,
 
@@ -252,14 +253,28 @@ SPAN           ::= '"' REGEX '"'
  of `->`), HTML engine inserts `A HREF` as needed, like here. If a fragment is the target
  of a link, this is mentioned in a automatically inserted marginalia.
 / += . "here" -> https://www.example.com
+/ += https://www.example.com -> . "inserted"
 
 >`*`: adds a note. HTML renders notes on the right margin. Example:
 
 ; code
->>This paragraph talks about one thing and then another thing.
+>>This paragraph talks about one thing and then another thing. A lot of
+  marginalia are inserted here for demonstration purposes.
 |/ +* "one thing" Also described in the next paragraph
 |/ +* "another thing" Which is actually a generalisation of the one thing.
+|/ += !phases-syntax "sentences" -> . "marginalia"
+|/ += https://www.example.com -> . "result"
+|/ +* "then" Add more colours.
+|/ +* "demonstration" Add even more colours.
+|/ +* "purposes" And more
 
->>The result looks like this: This paragraph talks about one thing and then another thing.
+>>The result looks like this: This paragraph talks about one thing and then
+  another thing. A lot of marginalia are inserted here for demonstration
+  purposes.
 / +* "one thing" Also described in the next paragraph
 / +* "another thing" Which is actually a generalisation of the one thing.
+/ += !phases-syntax "sentences" -> . "marginalia"
+/ += https://www.example.com -> . "result"
+/ +* "then" Add more colours.
+/ +* "demonstration" Add even more colours.
+/ +* "purposes" And more
