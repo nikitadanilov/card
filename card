@@ -464,6 +464,7 @@ class span_place(place):
         self.parent = parent
         self.span   = span_place.link_span(self, pattern)
         self.base   = base
+        self.pattern = pattern
         self.node.add(':spans', self.span)
     def __str__(self) -> str:
         return 'span_place: "' + self.pattern + '"'
@@ -531,6 +532,7 @@ class link:
         self.deck = d
         self.obj = obj
         self.s = s
+        self.quoted = False
         self.parse()
     def parse(self) -> None:
         parts = self.s.split('->', 1)
@@ -573,7 +575,7 @@ class note:
         self.place = span_place(self, obj, parts[0], NOTE_BASE)
         self.src = self
         self.idx = None
-        self.last = False
+        self.quoted = False
         obj.add(':notes', self)
         
 
@@ -624,23 +626,32 @@ class html_eng(eng):
             'span.annotation span.annotation { padding-bottom:4px; }\n'       +
             'span.annotation span.annotation span.annotation { padding-bottom:6px; }\n' +
             'span.annotation span.annotation span.annotation span.annotation { padding-bottom:8px; }\n' +
+            'span.linktarget { border-bottom: 2px solid; }\n'                  +
             '\n' +
             '.column {\n' +
             '    max-width: 60%;\n' +
             '    margin-right: 20%;\n' +
             '    margin-left: 20%;\n' +
             '}\n' +
-            '.margin {\n' +
-            '    margin-right: -32%;\n' +
+            '.margin-right {\n' +
+            '    margin-right: -22%;\n' +
             '    margin-left: 2%;\n' +
-            '    max-width: 30%;\n' +
+            '    max-width: 20%;\n' +
             '    margin-top: 0;\n' +
             '    font-size: 80%;\n' +
             '    text-align: left;\n' +
             '    float: right;\n' +
             '}\n' +
+            '.margin-left {\n' +
+            '    margin-left: -22%;\n' +
+            '    margin-right: 2%;\n' +
+            '    max-width: 20%;\n' +
+            '    margin-top: 0;\n' +
+            '    text-align: right;\n' +
+            '    float: left;\n' +
+            '}\n' +
             '\n')
-        self.html_note_colours = [ 'orange', 'blue', 'red', 'green' ]
+        self.html_note_colours = [ 'orange', 'blue', 'red', 'green', 'purple', 'violet' ]
         self.html_note_span = 'span[data-uid="{uid}"] {{ border-color: {colour}; }}'
         self.commands = {
             CARD_BEGIN   : html_eng.card_begin,
@@ -657,7 +668,7 @@ class html_eng(eng):
             LSRC_START   : html_eng.forward,
             LSRC_END     : html_eng.forward,
             LTGT_HERE    : html_eng.forward,
-            LTGT_START   : html_eng.forward,
+            LTGT_START   : html_eng.ltgt_start,
             LTGT_END     : html_eng.forward,
             TEXT         : html_eng.forward,
             STYLE_BEGIN  : html_eng.forward,
@@ -676,7 +687,7 @@ class html_eng(eng):
             LSRC_START   : html_eng.lsrc_start,
             LSRC_END     : html_eng.lsrc_end,
             LTGT_HERE    : html_eng.ltgt_here,
-            LTGT_START   : html_eng.ltgt_start,
+            LTGT_START   : html_eng.ltgt_start_render,
             LTGT_END     : html_eng.ltgt_end,
             TEXT         : html_eng.text,
             STYLE_BEGIN  : html_eng.style_begin,
@@ -701,6 +712,7 @@ class html_eng(eng):
         assert o == None
         self.indent += 1
         self.frag_indent = 0
+        n.ltgt_idx = 0
         n.series = []
     def card_end(self, c : cmd, n : card, o):
         assert o == None
@@ -745,15 +757,26 @@ class html_eng(eng):
         self.href_end()
         self.text(c, n, '] ')
     def ltgt_start(self, c : cmd, n : node, o : link):
-        self.out('<span class="linktarget">')
+        o.idx = n.note_idx
+        n.note_idx += 1
+        n.add(':html-note-left', o)
+        o.text = '[' + self.href_start_html(n, o.src) + \
+            str(n.parent.ltgt_idx) + self.href_end_html() + ']'
+        n.parent.ltgt_idx += 1
+        o.quoted = True
+        o.br = False
+        self.forward(c, n, o)
+    def ltgt_start_render(self, c : cmd, n : node, o : link):
+        self.out('<span class="linktarget" data-uid="{}">'.format(o.idx % len(self.html_note_colours)))
     def ltgt_end(self, c : cmd, n : node, o : link):
         self.out('</span>')
     def note_here(self, c : cmd, n : node, o : note):
         pass
     def note_start(self, c : cmd, n : node, o : note):
         o.idx = n.note_idx
+        o.br = True
         n.note_idx += 1
-        n.add(':html-note', o)
+        n.add(':html-note-right', o)
         self.forward(c, n, o)
     def note_start_render(self, c : cmd, n : node, o : note):
         self.out('<span class="annotation" data-uid="{}">'.format(o.idx % len(self.html_note_colours)))
@@ -807,16 +830,19 @@ class html_eng(eng):
             self.out('&nbsp; : &nbsp; ')
             self.out(html.escape(node.brief(140) + ' ...'))
             self.out('</p>')
-        
-    def href_start(self, fr : node, p : place):
+    def href_start_html(self, fr : node, p : place):
         if isinstance(p, url_place):
             ref = p.url
         else:
             assert isinstance(p, span_place) or isinstance(p, node_place)
             ref = self.href(fr, p.node)
-        self.out(self.html_href_pair[0].format(**{ 'ref' : ref }))
+        return self.html_href_pair[0].format(**{ 'ref' : ref })
+    def href_end_html(self):
+        return self.html_href_pair[1]
+    def href_start(self, fr : node, p : place):
+        self.out(self.href_start_html(fr, p))
     def href_end(self):
-        self.out(self.html_href_pair[1])
+        self.out(self.href_end_html())
     def formatif(self, notempty : str, empty : str, s : str):
         return empty if s == '' else notempty.format(s)
     def outnl(self, content : str):
@@ -891,12 +917,21 @@ class html_eng(eng):
                     self.href_end()
                 self.out('&nbsp;&nbsp;&nbsp;')
     def frag_render_begin(self, d : deck, c : card, f : frag):
-        if f.has(':html-note'):
-            self.out('<p class="margin">')
-            for m in f.get(':html-note', list, []):
+        if f.has(':html-note-right'):
+            self.out('<p class="margin-right">')
+            for m in f.get(':html-note-right', list, []):
                 self.out('<span class="annotation" data-uid="{}">'.format(m.idx % len(self.html_note_colours)))
-                self.render_text(m.text)
-                self.out('</span><br>')
+                self.out(m.text) if m.quoted else self.render_text(m.text)
+                self.out('</span>&nbsp;')
+                self.out('<br>') if m.br else None
+            self.out('</p>')
+        if f.has(':html-note-left'):
+            self.out('<p class="margin-left">')
+            for m in f.get(':html-note-left', list, []):
+                self.out('<span class="annotation" data-uid="{}">'.format(m.idx % len(self.html_note_colours)))
+                self.out(m.text) if m.quoted else self.render_text(m.text)
+                self.out('</span>&nbsp;')
+                self.out('<br>') if m.br else None
             self.out('</p>')
         attrs = self.formatif(' style="{}"', '', self.style_text(f))
         if f.frag_indent != 0:

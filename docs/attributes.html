@@ -38,12 +38,18 @@ Add a link to a web-page here ...
 / += . &quot;here&quot; -&gt; https://www.example.com
 
 Another paragraph. Link _to_ it from a particular text in the previous paragraph. 
-/ += CARD0-PARA0 &quot;a link&quot; -&gt; . &quot;Link&quot;</code></pre>
-<a name="attributes-00012"></a><p>When a fragment is the source of a link (<i>i.e.</i>, when it is on the left-hand side  of <code class="inline">-&gt;</code>), HTML engine inserts <code class="inline">A HREF</code> as needed, like <a href="https://www.example.com">here</a>. If a fragment is the target  of a link, this is mentioned in a automatically inserted marginalia.</p>
+/ += CARD0-PARA0 &quot;a link&quot; -&gt; . &quot;Link&quot;</code></pre><p class="margin-left"><span class="annotation" data-uid="0">[<a href="https://www.example.com">0</a>]</span>&nbsp;</p>
+<a name="attributes-00012"></a><p>When a fragment is the source of a link (<i>i.e.</i>, when it is on the left-hand side  of <code class="inline">-&gt;</code>), HTML engine inserts <code class="inline">A HREF</code> as needed, like <a href="https://www.example.com">here</a>. If a fragment is the target  of a link, this is mentioned in a automatically <span class="linktarget" data-uid="0">inserted</span> marginalia.</p>
 <a name="attributes-00013"></a><p><code class="inline">*</code>: adds a note. HTML renders notes on the right margin. Example:</p>
-<a name="attributes-00014"></a><pre><code>This paragraph talks about one thing and then another thing.
+<a name="attributes-00014"></a><pre><code>This paragraph talks about one thing and then another thing. A lot of
+  marginalia are inserted here for demonstration purposes.
 / +* &quot;one thing&quot; Also described in the next paragraph
-/ +* &quot;another thing&quot; Which is actually a generalisation of the one thing.</code></pre><p class="margin"><span class="annotation" data-uid="0"> Also described in the next paragraph</span><br><span class="annotation" data-uid="1"> Which is actually a generalisation of the one thing.</span><br></p>
-<a name="attributes-00015"></a><p>The result looks like this: This paragraph talks about <span class="annotation" data-uid="0">one thing</span> and then <span class="annotation" data-uid="1">another thing</span>.</p><footer><a href="syntax.html#syntax">&lt;</a>&nbsp;<a href="series_trunk.html">trunk</a>&nbsp;&gt;&nbsp;&nbsp;&nbsp;</footer></div>
+/ +* &quot;another thing&quot; Which is actually a generalisation of the one thing.
+/ += !phases-syntax &quot;sentences&quot; -&gt; . &quot;marginalia&quot;
+/ += https://www.example.com -&gt; . &quot;result&quot;
+/ +* &quot;then&quot; Add more colours.
+/ +* &quot;demonstration&quot; Add even more colours.
+/ +* &quot;purposes&quot; And more</code></pre><p class="margin-right"><span class="annotation" data-uid="1"> Also described in the next paragraph</span>&nbsp;<br><span class="annotation" data-uid="2"> Add more colours.</span>&nbsp;<br><span class="annotation" data-uid="3"> Which is actually a generalisation of the one thing.</span>&nbsp;<br><span class="annotation" data-uid="5"> Add even more colours.</span>&nbsp;<br><span class="annotation" data-uid="0"> And more</span>&nbsp;<br></p><p class="margin-left"><span class="annotation" data-uid="0">[<a href="https://www.example.com">1</a>]</span>&nbsp;<span class="annotation" data-uid="4">[<a href="phases.html#phases-syntax">2</a>]</span>&nbsp;</p>
+<a name="attributes-00015"></a><p>The <span class="linktarget" data-uid="0">result</span> looks like this: This paragraph talks about <span class="annotation" data-uid="1">one thing</span> and <span class="annotation" data-uid="2">then</span>   <span class="annotation" data-uid="3">another thing</span>. A lot of <span class="linktarget" data-uid="4">marginalia</span> are inserted here for <span class="annotation" data-uid="5">demonstration</span>   <span class="annotation" data-uid="0">purposes</span>.</p><footer><a href="syntax.html#syntax">&lt;</a>&nbsp;<a href="series_trunk.html">trunk</a>&nbsp;&gt;&nbsp;&nbsp;&nbsp;</footer></div>
  </body>
 </html>
