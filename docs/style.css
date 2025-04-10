@@ -58,12 +58,12 @@ white-space: pre;
 }
 @font-face {
 font-family: "F1785 GLC Baskerville Normal";
-src: url("https://db.onlinewebfonts.com/t/e9f7c9e5bb2ce4999d74663e6b23f860.eot");
-src: url("https://db.onlinewebfonts.com/t/e9f7c9e5bb2ce4999d74663e6b23f860.eot?#iefix") format("embedded-opentype"),
-url("https://db.onlinewebfonts.com/t/e9f7c9e5bb2ce4999d74663e6b23f860.woff2") format("woff2"),
-url("https://db.onlinewebfonts.com/t/e9f7c9e5bb2ce4999d74663e6b23f860.woff") format("woff"),
-url("https://db.onlinewebfonts.com/t/e9f7c9e5bb2ce4999d74663e6b23f860.ttf") format("truetype"),
-url("https://db.onlinewebfonts.com/t/e9f7c9e5bb2ce4999d74663e6b23f860.svg#F1785 GLC Baskerville Normal")format("svg");
+src: url("https://raw.githubusercontent.com/nikitadanilov/card/refs/heads/master/fonts/1785-GLC-Baskerville.eot");
+src: url("https://raw.githubusercontent.com/nikitadanilov/card/refs/heads/master/fonts/1785-GLC-Baskerville.eot?#iefix") format("embedded-opentype"),
+url("https://raw.githubusercontent.com/nikitadanilov/card/refs/heads/master/fonts/1785-GLC-Baskerville.woff2") format("woff2"),
+url("https://raw.githubusercontent.com/nikitadanilov/card/refs/heads/master/fonts/1785-GLC-Baskerville.woff") format("woff"),
+url("https://raw.githubusercontent.com/nikitadanilov/card/refs/heads/master/fonts/1785-GLC-Baskerville.ttf") format("truetype"),
+url("https://raw.githubusercontent.com/nikitadanilov/card/refs/heads/master/fonts/1785-GLC-Baskerville.svg#F1785 GLC Baskerville Normal") format("svg");
 }
 code.inline { display: inline; background-color: #ebebeb; font-size: 0.75em; }
 pre code  {
