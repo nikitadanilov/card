@@ -49,7 +49,7 @@ a         { color: #2288bb; text-decoration:underline; }
 a:visited { color: #888888; }
 a:hover   { color: white; background-color: #33aaff; text-decoration:underline; }
 code      {
-font-family: Menlo, Consolas, Monaco, Liberation Mono, Lucida Console, monospace;
+font-family: "Hermes TTY EWD", Menlo, Consolas, Monaco, Liberation Mono, Lucida Console, monospace;
 font-size: 0.95em;
 background-color: #f7f7f7;
 color: #333;
@@ -65,8 +65,17 @@ url("https://raw.githubusercontent.com/nikitadanilov/card/refs/heads/master/font
 url("https://raw.githubusercontent.com/nikitadanilov/card/refs/heads/master/fonts/1785-GLC-Baskerville.ttf") format("truetype"),
 url("https://raw.githubusercontent.com/nikitadanilov/card/refs/heads/master/fonts/1785-GLC-Baskerville.svg#F1785 GLC Baskerville Normal") format("svg");
 }
+@font-face {
+font-family: "Hermes TTY EWD";
+src: url("https://raw.githubusercontent.com/nikitadanilov/card/refs/heads/master/fonts/Hermes-TTY-EWD.ttf") format("truetype");
+}
+@font-face {
+font-family: "Glass TTY VT220";
+src: url("https://raw.githubusercontent.com/nikitadanilov/card/refs/heads/master/fonts/Glass-TTY-VT220.ttf") format("truetype");
+}
 code.inline { display: inline; background-color: #ebebeb; font-size: 0.75em; }
 pre code  {
+font-family: "Hermes TTY EWD", Menlo, Consolas, Monaco, Liberation Mono, Lucida Console, monospace;
 display: block;
 padding: 1em;
 margin: 1em 0;
