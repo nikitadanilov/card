@@ -650,6 +650,14 @@ class html_eng(eng):
             '    text-align: right;\n' +
             '    float: left;\n' +
             '}\n' +
+            'table.no-borders,\n' +
+            'table.no-borders th,\n' +
+            'table.no-borders td {\n' +
+            '    border: none;\n' +
+            '}\n' +
+            'table.no-borders {\n' +
+            '    border-collapse: collapse;\n' +
+            '}\n' +
             '\n')
         self.html_note_colours = [ 'orange', 'blue', 'red', 'green', 'purple', 'violet' ]
         self.html_note_span = 'span[data-uid="{uid}"] {{ border-color: {colour}; }}'
@@ -761,7 +769,10 @@ class html_eng(eng):
         n.note_idx += 1
         n.add(':html-note-left', o)
         o.text = '[' + self.href_start_html(n, o.src) + \
-            str(n.parent.ltgt_idx) + self.href_end_html() + ']'
+            '<span style="color: {}">'.format(self.html_note_colours[o.idx % len(self.html_note_colours)]) + \
+            str(n.parent.ltgt_idx) + \
+            '</span>' + \
+            self.href_end_html() + ']'
         n.parent.ltgt_idx += 1
         o.quoted = True
         o.br = False
@@ -811,6 +822,8 @@ class html_eng(eng):
                 f.set(html_anchor, html.escape(f.get(html_anchor, str, f.id())))
     def series_file(self, trunk : str) -> str:
         return 'series_' + trunk + '.html'
+    def tags_file(self, tag : str) -> str:
+        return 'tags_' + tag + '.html'
     def series_index(self) -> None:
         for trunk in self.deck.series:
             self.fd = open(self.series_file(trunk), 'w')
@@ -818,18 +831,62 @@ class html_eng(eng):
             self.series_trunk(trunk)
             self.out(self.html_card_end)
             self.fd.close()
+    def tags_index(self) -> None:
+        for tag in self.deck.tags:
+            self.fd = open(self.tags_file(tag), 'w')
+            self.file_begin('Tag ' + tag, '', '')
+            self.tag_list(tag)
+            self.out(self.html_card_end)
+            self.fd.close()
+    def href_wrap(self, target : str, text : str) -> str:
+        return self.html_href_pair[0].format(**{ 'ref' : target }) + \
+            html.escape(text) + self.html_href_pair[1]
+    def card_row(self, c : card) -> List[str]:
+        title = self.href_wrap(c.get(html_file) + '#' + c.get(html_anchor),
+                               c.get('card-title', str, None))
+        brief = html.escape(c.brief(80) + ' ...')
+        tags  = ' &nbsp; '.join([self.href_wrap(self.tags_file(t), t)
+                                 for t in sorted(c.get('tags', list, []))])
+        series = []
+        trunks = {}
+        for (trunk, z) in c.get(':#', list, []):
+            trunks[trunk] = '+'
+        for trunk in sorted(self.deck.series):
+            series += ['<tt>' + trunks.get(trunk, '-') + '</tt>']
+        return [title, brief, tags] + series
+    def series_header(self):
+        out = ''
+        for t in sorted(self.deck.series):
+            out += '<th>' + self.href_wrap(self.series_file(t), t) + '</th>'
+        return out
     def series_trunk(self, trunk : str) -> None:
         sequence = list(self.deck.series[trunk])
         sequence.sort()
+        self.out('<table class="no-borders">')
+        self.out('<thead><tr><th></th><th>Name</th><th>Brief</th><th>Tags</th>' + \
+                 self.series_header() + '</tr></thead>')
         for zahl in sequence:
             node = self.deck.series[trunk][zahl]
-            self.out('<p>')
-            self.out(self.html_href_pair[0].format(**{ 'ref' : node.get(html_file) + '#' + node.get(html_anchor) }))
+            self.out('<tr>')
+            self.out('<td>')
             self.out(html.escape(zahl))
-            self.out(self.html_href_pair[1])
-            self.out('&nbsp; : &nbsp; ')
-            self.out(html.escape(node.brief(140) + ' ...'))
-            self.out('</p>')
+            self.out('</td>')
+            for td in self.card_row(node):
+                self.out('<td>')
+                self.out(td)
+                self.out('</td>')
+            self.out('</tr>')
+        self.out('</table>')
+    def tag_list(self, tag : str) -> None:
+        self.out('<table class="no-borders">')
+        for node in self.deck.tags[tag]:
+            self.out('<tr>')
+            for td in self.card_row(node):
+                self.out('<td>')
+                self.out(td)
+                self.out('</td>')
+            self.out('</tr>')
+        self.out('</table>')
     def href_start_html(self, fr : node, p : place):
         if isinstance(p, url_place):
             ref = p.url
@@ -874,6 +931,7 @@ class html_eng(eng):
                 self.frag_render_end(self.deck, c, f)
             self.card_render_end(self.deck, c)
         self.series_index()
+        self.tags_index()
         self.deck_render_end(self.deck)
     def deck_render_begin(self, d : deck):
         dir = self.deck.get('dir', str, 'html_out')
@@ -885,6 +943,7 @@ class html_eng(eng):
     def card_render_begin(self, d : deck, c : card):
         self.fd = open(c.get(html_file, str, None), 'w')
         title = html.escape(c.get('name', str, c.get('label', str, 'Card {}'.format(c.id()))))
+        c.set('card-title', title)
         self.file_begin(title, self.style_text(c), c.get(html_anchor, str, None))
         self.out('<div class="column">')
         self.out('<header>')
@@ -917,22 +976,17 @@ class html_eng(eng):
                     self.href_end()
                 self.out('&nbsp;&nbsp;&nbsp;')
     def frag_render_begin(self, d : deck, c : card, f : frag):
-        if f.has(':html-note-right'):
-            self.out('<p class="margin-right">')
-            for m in f.get(':html-note-right', list, []):
-                self.out('<span class="annotation" data-uid="{}">'.format(m.idx % len(self.html_note_colours)))
-                self.out(m.text) if m.quoted else self.render_text(m.text)
-                self.out('</span>&nbsp;')
-                self.out('<br>') if m.br else None
-            self.out('</p>')
-        if f.has(':html-note-left'):
-            self.out('<p class="margin-left">')
-            for m in f.get(':html-note-left', list, []):
-                self.out('<span class="annotation" data-uid="{}">'.format(m.idx % len(self.html_note_colours)))
-                self.out(m.text) if m.quoted else self.render_text(m.text)
-                self.out('</span>&nbsp;')
-                self.out('<br>') if m.br else None
-            self.out('</p>')
+        for dir in ['left', 'right']:
+            def fmt(s : string):
+                return s.format(dir)
+            if f.has(fmt(':html-note-{}')):
+                self.out(fmt('<p class="margin-{}">'))
+                for m in f.get(fmt(':html-note-{}'), list, []):
+                    self.out('<span class="annotation" data-uid="{}">'.format(m.idx % len(self.html_note_colours)))
+                    self.out(m.text) if m.quoted else self.render_text(m.text)
+                    self.out('</span>&nbsp;')
+                    self.out('<br>') if m.br else None
+                self.out('</p>')
         attrs = self.formatif(' style="{}"', '', self.style_text(f))
         if f.frag_indent != 0:
             attrs += ' ' + self.indent_attr.format(**{ 'indent' : 3 * f.frag_indent })
