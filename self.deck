@@ -1,4 +1,5 @@
 // C card self-documentation deck
+// name Overview
 // id index
 // +# trunk 0
 This is the documentation for the card tool.
@@ -27,6 +28,7 @@ its own quotation):
 
 ; code
 |// C card self-documentation deck
+|// name Overview
 |// id intro
 |// +# trunk 0
 |This is the documentation for the card tool.
@@ -67,8 +69,11 @@ that is) the content source more readable.
 
 \
 
+// name Card processing phases
 // id phases
 // +# trunk 1
+// +tags phases
+// +# processing A
 Deck processing happens in the following phases:
 
 > *1*. Syntax. The deck consists of one of more _cardfiles_. Cardfiles are read
@@ -119,8 +124,11 @@ Deck processing happens in the following phases:
 
 \
 
+// name Card syntax
 // id syntax
 // +# trunk 2
+// +tags phases
+// +# processing B
 
 The cardfile syntax is extremely simple and line-oriented. The first character
 of a line determines the parser state transition.
@@ -188,8 +196,12 @@ next card.
 
 \
 
+// name Card attributes
 // id attributes
 // +# trunk 3
+// +tags phases
+// +tags attributes
+// +# processing C
 
 Attributes are key-value pairs attached to nodes. card uses some of the
 attributes to drive layout creation and then its rendition by the engine. Other
