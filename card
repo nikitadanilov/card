@@ -23,6 +23,7 @@ import collections
 import html
 import re
 import requests
+import random
 from typing import List, Dict, Optional, Tuple
 from typeguard import typechecked # Must be installed.
 
@@ -152,7 +153,8 @@ class code(frag):
 
 @typechecked
 class math(frag):
-    pass
+    def line_add(self, line : str):
+        self.lines += [line] # Do not strip math
 
 frag_types = {
     'para' : para,
@@ -600,6 +602,7 @@ class html_eng(eng):
             '   <title>{title}</title>\n'                     +
             '   <link rel="stylesheet" href="{stylefile}">\n' +
             '   <style>{style}</style>\n'                     +
+            '   {math}\n'                                     +
             ' </head>\n'                                      +
             ' <body>\n'                                       +
             '   <a name="{anchor}"></a>')
@@ -611,7 +614,7 @@ class html_eng(eng):
         self.html_frag_pair = {
             para : ('<p{attrs}>',         '</p>'),
             code : ('<pre><code{attrs}>', '</code></pre>'),
-            math : ('<math{attrs}>',      '</math>')
+            math : ('$$',      '$$')
         }
         self.html_href_pair = ('<a href="{ref}">', '</a>')
         self.html_styles_pair = {
@@ -619,7 +622,8 @@ class html_eng(eng):
             S_ITALIC   : ('<i>',    '</i>'),
             S_BOLD     : ('<b>',    '</b>'),
             S_UNDER    : ('<u>',    '</u>'),
-            S_CODE     : ('<code class="inline">', '</code>')
+            S_CODE     : ('<code class="inline">', '</code>'),
+            S_MATH     : ('',    '') # Used only as a trigger to set card.hasmath.
         }
         self.html_style_internal = (
             'span.annotation { border-bottom: 2px solid; }\n'                  +
@@ -658,9 +662,17 @@ class html_eng(eng):
             'table.no-borders {\n' +
             '    border-collapse: collapse;\n' +
             '}\n' +
+            'mjx-container[display="true"] {\n' +
+            '    font-size: 1.2em !important;\n' +
+            '}\n' +
+            'mjx-container:not([display="true"]) {\n' +
+            '    font-size: 1em !important;\n' +
+            '}\n' +
             '\n')
         self.html_note_colours = [ 'orange', 'blue', 'red', 'green', 'purple', 'violet' ]
         self.html_note_span = 'span[data-uid="{uid}"] {{ border-color: {colour}; }}'
+        self.html_math_script = """
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>"""
         self.commands = {
             CARD_BEGIN   : html_eng.card_begin,
             CARD_END     : html_eng.card_end,
@@ -679,7 +691,7 @@ class html_eng(eng):
             LTGT_START   : html_eng.ltgt_start,
             LTGT_END     : html_eng.forward,
             TEXT         : html_eng.forward,
-            STYLE_BEGIN  : html_eng.forward,
+            STYLE_BEGIN  : html_eng.style_begin,
             STYLE_END    : html_eng.forward,
             BEGIN        : html_eng.begin,
             END          : html_eng.end,
@@ -698,7 +710,7 @@ class html_eng(eng):
             LTGT_START   : html_eng.ltgt_start_render,
             LTGT_END     : html_eng.ltgt_end,
             TEXT         : html_eng.text,
-            STYLE_BEGIN  : html_eng.style_begin,
+            STYLE_BEGIN  : html_eng.style_begin_render,
             STYLE_END    : html_eng.style_end,
             NOTE_HERE    : html_eng.note_here,
             NOTE_START   : html_eng.note_start_render,
@@ -711,24 +723,26 @@ class html_eng(eng):
         self.render()
     def exec(self, c : cmd):
         self.commands[c.opc](self, c, c.node, c.obj)
-    def file_begin(self, title : str, style : str, anchor : str):
+    def file_begin(self, title : str, style : str, anchor : str, math : str):
         self.out(self.html_card_begin.format(**{ 'title'     : title,
                                                  'stylefile' : self.style_file,
                                                  'style'     : style,
-                                                 'anchor'    : anchor }))
+                                                 'anchor'    : anchor,
+                                                 'math'      : math }))
     def card_begin(self, c : cmd, n : card, o):
         assert o == None
         self.indent += 1
         self.frag_indent = 0
         n.ltgt_idx = 0
         n.series = []
+        n.hasmath = False
     def card_end(self, c : cmd, n : card, o):
         assert o == None
         self.indent -= 1
     def frag_begin(self, c : cmd, n : frag, o):
         assert o == None
         self.indent += 1
-        n.note_idx = 0
+        n.note_idx = random.randrange(len(self.html_note_colours))
         n.html_cmds = []
         n.frag_indent = 0
     def frag_end(self, c : cmd, n : frag, o):
@@ -743,6 +757,7 @@ class html_eng(eng):
     def code_end(self, c : cmd, n : code, o):
         self.frag_end(c, n, o)
     def math_begin(self, c : cmd, n : math, o):
+        n.parent.hasmath = True
         self.frag_begin(c, n, o)
     def math_end(self, c : cmd, n : math, o):
         self.frag_end(c, n, o)
@@ -796,6 +811,10 @@ class html_eng(eng):
     def text(self, c : cmd, n : node, o : str):
         self.out(html.escape(o))
     def style_begin(self, c : cmd, n : node, style : int):
+        if style == S_MATH:
+            n.parent.hasmath = True
+        self.forward(c, n, style)
+    def style_begin_render(self, c : cmd, n : node, style : int):
         self.out(self.html_styles_pair[style][0])
     def style_end(self, c : cmd, n : node, style : int):
         self.out(self.html_styles_pair[style][1])
@@ -827,14 +846,14 @@ class html_eng(eng):
     def series_index(self) -> None:
         for trunk in self.deck.series:
             self.fd = open(self.series_file(trunk), 'w')
-            self.file_begin('Series ' + trunk, '', '')
+            self.file_begin('Series ' + trunk, '', '', '')
             self.series_trunk(trunk)
             self.out(self.html_card_end)
             self.fd.close()
     def tags_index(self) -> None:
         for tag in self.deck.tags:
             self.fd = open(self.tags_file(tag), 'w')
-            self.file_begin('Tag ' + tag, '', '')
+            self.file_begin('Tag ' + tag, '', '', '')
             self.tag_list(tag)
             self.out(self.html_card_end)
             self.fd.close()
@@ -935,7 +954,7 @@ class html_eng(eng):
         self.deck_render_end(self.deck)
     def deck_render_begin(self, d : deck):
         dir = self.deck.get('dir', str, 'html_out')
-        os.mkdir(dir)
+        os.makedirs(dir, exist_ok = True)
         os.chdir(dir)
         self.style_build()
     def deck_render_end(self, d : deck):
@@ -944,7 +963,10 @@ class html_eng(eng):
         self.fd = open(c.get(html_file, str, None), 'w')
         title = html.escape(c.get('name', str, c.get('label', str, 'Card {}'.format(c.id()))))
         c.set('card-title', title)
-        self.file_begin(title, self.style_text(c), c.get(html_anchor, str, None))
+        self.file_begin(title, self.style_text(c), c.get(html_anchor, str, None),
+                        self.html_math_script if c.hasmath else '')
+        if c.hasmath:
+            self.out('\n'.join(c.join('TeX')) + '\n')
         self.out('<div class="column">')
         self.out('<header>')
         self.out(title)
@@ -993,7 +1015,6 @@ class html_eng(eng):
         self.outnl((self.html_anchor + \
                     self.html_frag_pair[type(f)][0]).format(**{ 'anchor'  : f.get(html_anchor),
                                                                 'attrs'   : attrs }))
-        pass
     def frag_render_content(self, d : deck, c : card, f : frag):
         for c in f.html_cmds:
             self.render_commands[c.opc](self, c, c.node, c.obj)
@@ -1078,13 +1099,15 @@ S_ITALIC   = 2
 S_BOLD     = 3
 S_CODE     = 4
 S_UNDER    = 5
+S_MATH     = 6
 
 stylenames = {
     'em' : S_EMPHASIS,
     'it' : S_ITALIC,
     'bd' : S_BOLD,
     'un' : S_UNDER,
-    'cd' : S_CODE
+    'cd' : S_CODE,
+    'ma' : S_MATH
 }
 
 @typechecked

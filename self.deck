@@ -290,3 +290,18 @@ SPAN           ::= '"' REGEX '"'
 / +* "then" Add more colours.
 / +* "demonstration" Add even more colours.
 / +* "purposes" And more
+
+\
+
+/// +TeX \( \def\foo{\operatorname{foo}} \)
+
+// name Math
+// id math
+// +# trunk 4
+// +TeX \( \def\Bag{\operatorname{Bag}} \)
+AAA Example \(x = \foo\) more. More text. more. More text.more. More text.more. More text.more. More text.more. More text.more. More text.more. More text.more. More text.more. More text.more. More text.more. More text.more. More text.more. More text.more. More text.more. More text.more. More text.more. More text. \(  \) Definition.
+
+; math
+\Bag(x) = e^x = 1 + x + \frac{x^2}{2!} + \frac{x^3}{3!} + \cdots + \frac{x^n}{n!} + \cdots
+
+
