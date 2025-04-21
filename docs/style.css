@@ -34,6 +34,12 @@ table.no-borders td {
 table.no-borders {
     border-collapse: collapse;
 }
+mjx-container[display="true"] {
+    font-size: 1.2em !important;
+}
+mjx-container:not([display="true"]) {
+    font-size: 1em !important;
+}
 
 
 span[data-uid="0"] { border-color: orange; }
