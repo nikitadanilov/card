@@ -954,11 +954,14 @@ class html_eng(eng):
         self.deck_render_end(self.deck)
     def deck_render_begin(self, d : deck):
         dir = self.deck.get('dir', str, 'html_out')
-        os.makedirs(dir, exist_ok = True)
-        os.chdir(dir)
+        self.changedir = dir != '.'
+        if self.changedir:
+            os.makedirs(dir, exist_ok = True)
+            os.chdir(dir)
         self.style_build()
     def deck_render_end(self, d : deck):
-        os.chdir('..')
+        if self.changedir:
+            os.chdir('..')
     def card_render_begin(self, d : deck, c : card):
         self.fd = open(c.get(html_file, str, None), 'w')
         title = html.escape(c.get('name', str, c.get('label', str, 'Card {}'.format(c.id()))))
