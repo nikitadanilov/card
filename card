@@ -631,7 +631,7 @@ class html_eng(eng):
             S_CODE     : ('<code class="inline">', '</code>'),
             S_MATH     : ('',    '') # Used only as a trigger to set card.hasmath.
         }
-        self.html_img = '<img src="{url}" border="0">'
+        self.html_img = '<img src="{url}" border="0" width=50%>'
         self.html_style_internal = (
             'span.annotation { border-bottom: 2px solid; }\n'                  +
             'span.annotation span.annotation { padding-bottom:4px; }\n'       +
@@ -904,6 +904,8 @@ class html_eng(eng):
         self.out('</table>')
     def tag_list(self, tag : str) -> None:
         self.out('<table class="no-borders">')
+        self.out('<thead><tr><th>Name</th><th>Brief</th><th>Tags</th>' + \
+                 self.series_header() + '</tr></thead>')
         for node in self.deck.tags[tag]:
             self.out('<tr>')
             for td in self.card_row(node):
