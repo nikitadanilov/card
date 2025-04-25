@@ -115,6 +115,7 @@ class frag(node):
         node.__init__(self, c)
         self.lines = []
         self.set(':markers', collections.defaultdict(list))
+        self.frag_indent = 0
     def line_add(self, line : str):
         self.lines += [line.rstrip('\n') + ' ']
     def content(self) -> str:
@@ -156,10 +157,14 @@ class math(frag):
     def line_add(self, line : str):
         self.lines += [line] # Do not strip math
 
+class img(frag):
+    pass
+
 frag_types = {
     'para' : para,
     'code' : code,
-    'math' : math
+    'math' : math,
+    'img'  : img
 }
 
 @typechecked
@@ -614,7 +619,8 @@ class html_eng(eng):
         self.html_frag_pair = {
             para : ('<p{attrs}>',         '</p>'),
             code : ('<pre><code{attrs}>', '</code></pre>'),
-            math : ('$$',      '$$')
+            math : ('$$',      '$$'),
+            img  : ('<p{attrs}>',         '</p>'),
         }
         self.html_href_pair = ('<a href="{ref}">', '</a>')
         self.html_styles_pair = {
@@ -625,6 +631,7 @@ class html_eng(eng):
             S_CODE     : ('<code class="inline">', '</code>'),
             S_MATH     : ('',    '') # Used only as a trigger to set card.hasmath.
         }
+        self.html_img = '<img src="{url}" border="0">'
         self.html_style_internal = (
             'span.annotation { border-bottom: 2px solid; }\n'                  +
             'span.annotation span.annotation { padding-bottom:4px; }\n'       +
@@ -744,7 +751,6 @@ class html_eng(eng):
         self.indent += 1
         n.note_idx = random.randrange(len(self.html_note_colours))
         n.html_cmds = []
-        n.frag_indent = 0
     def frag_end(self, c : cmd, n : frag, o):
         assert o == None
         self.indent -= 1
@@ -1018,6 +1024,8 @@ class html_eng(eng):
         self.outnl((self.html_anchor + \
                     self.html_frag_pair[type(f)][0]).format(**{ 'anchor'  : f.get(html_anchor),
                                                                 'attrs'   : attrs }))
+        if isinstance(f, img):
+            self.outnl(self.html_img.format(**{ 'url' : f.get('url') }))
     def frag_render_content(self, d : deck, c : card, f : frag):
         for c in f.html_cmds:
             self.render_commands[c.opc](self, c, c.node, c.obj)
