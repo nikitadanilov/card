@@ -620,7 +620,7 @@ class html_eng(eng):
             para : ('<p{attrs}>',         '</p>'),
             code : ('<pre><code{attrs}>', '</code></pre>'),
             math : ('$$',      '$$'),
-            img  : ('<p{attrs}>',         '</p>'),
+            img  : ('<p{attrs}><center>', '</center></p>'),
         }
         self.html_href_pair = ('<a href="{ref}">', '</a>')
         self.html_styles_pair = {
