@@ -631,7 +631,7 @@ class html_eng(eng):
             S_CODE     : ('<code class="inline">', '</code>'),
             S_MATH     : ('',    '') # Used only as a trigger to set card.hasmath.
         }
-        self.html_img = '<img src="{url}" border="0" width=50%>'
+        self.html_img = '<img src="{url}" border="0" width="{width}">'
         self.html_style_internal = (
             'span.annotation { border-bottom: 2px solid; }\n'                  +
             'span.annotation span.annotation { padding-bottom:4px; }\n'       +
@@ -1027,7 +1027,8 @@ class html_eng(eng):
                     self.html_frag_pair[type(f)][0]).format(**{ 'anchor'  : f.get(html_anchor),
                                                                 'attrs'   : attrs }))
         if isinstance(f, img):
-            self.outnl(self.html_img.format(**{ 'url' : f.get('url') }))
+            self.outnl(self.html_img.format(**{ 'url' : f.get('url'),
+                                                'width' : f.get('width', str, '50%') }))
     def frag_render_content(self, d : deck, c : card, f : frag):
         for c in f.html_cmds:
             self.render_commands[c.opc](self, c, c.node, c.obj)
