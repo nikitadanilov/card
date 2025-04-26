@@ -635,7 +635,10 @@ class html_eng(eng):
             S_BOLD     : ('<b>',    '</b>'),
             S_UNDER    : ('<u>',    '</u>'),
             S_CODE     : ('<code class="inline">', '</code>'),
-            S_MATH     : ('',    '') # Used only as a trigger to set card.hasmath.
+            S_MATH     : ('',    ''), # Used only as a trigger to set card.hasmath.
+            S_ALEFT    : ('<span class="align-left">',    '</span>'),
+            S_ARIGHT   : ('<span class="align-right">',   '</span>'),
+            S_ACENTRE  : ('<span class="align-centre">',  '</span>'),
         }
         self.html_img = '<img src="{url}" border="0" width="{width}">'
         self.html_style_internal = (
@@ -680,6 +683,21 @@ class html_eng(eng):
             '}\n' +
             'mjx-container:not([display="true"]) {\n' +
             '    font-size: 1em !important;\n' +
+            '}\n' +
+            '.align-left {\n' +
+            '  display: inline-block;\n' +
+            '  width: 100%;\n' +
+            '  text-align: left;\n' +
+            '}\n' +
+            '.align-right {\n' +
+            '  display: inline-block;\n' +
+            '  width: 100%;\n' +
+            '  text-align: right;\n' +
+            '}\n' +
+            '.align-centre {\n' +
+            '  display: inline-block;\n' +
+            '  width: 100%;\n' +
+            '  text-align: center;\n' +
             '}\n' +
             '\n')
         self.html_note_colours = [ 'orange', 'blue', 'red', 'green', 'purple', 'violet' ]
@@ -1131,6 +1149,9 @@ S_BOLD     = 3
 S_CODE     = 4
 S_UNDER    = 5
 S_MATH     = 6
+S_ALEFT    = 7
+S_ARIGHT   = 8
+S_ACENTRE  = 9
 
 stylenames = {
     'em' : S_EMPHASIS,
@@ -1138,7 +1159,10 @@ stylenames = {
     'bd' : S_BOLD,
     'un' : S_UNDER,
     'cd' : S_CODE,
-    'ma' : S_MATH
+    'ma' : S_MATH,
+    'al' : S_ALEFT,
+    'ar' : S_ARIGHT,
+    'ac' : S_ACENTRE
 }
 
 @typechecked
