@@ -160,11 +160,15 @@ class math(frag):
 class img(frag):
     pass
 
+class head(frag):
+    pass
+
 frag_types = {
     'para' : para,
     'code' : code,
     'math' : math,
-    'img'  : img
+    'img'  : img,
+    'head' : head
 }
 
 @typechecked
@@ -258,7 +262,8 @@ class deck(node):
         frag_cmds = {
             para : (PARA_BEGIN, PARA_END),
             math : (MATH_BEGIN, MATH_END),
-            code : (CODE_BEGIN, CODE_END)
+            code : (CODE_BEGIN, CODE_END),
+            code : (HEAD_BEGIN, HEAD_END)
         }
         # Pass 0: build identifiers index, it is needed to resolve link names, etc. later.
         self.tagid(self)
@@ -619,8 +624,9 @@ class html_eng(eng):
         self.html_frag_pair = {
             para : ('<p{attrs}>',         '</p>'),
             code : ('<pre><code{attrs}>', '</code></pre>'),
-            math : ('$$',      '$$'),
+            math : ('$$',                 '$$'),
             img  : ('<p{attrs}><center>', '</center></p>'),
+            head : ('<h{level}>',         '</h{level}>')
         }
         self.html_href_pair = ('<a href="{ref}">', '</a>')
         self.html_styles_pair = {
@@ -689,6 +695,8 @@ class html_eng(eng):
             PARA_END     : html_eng.para_end,
             CODE_BEGIN   : html_eng.code_begin,
             CODE_END     : html_eng.code_end,
+            HEAD_BEGIN   : html_eng.head_begin,
+            HEAD_END     : html_eng.head_end,
             MATH_BEGIN   : html_eng.math_begin,
             MATH_END     : html_eng.math_end,
             LSRC_HERE    : html_eng.forward,
@@ -761,6 +769,10 @@ class html_eng(eng):
     def code_begin(self, c : cmd, n : code, o):
         self.frag_begin(c, n, o)
     def code_end(self, c : cmd, n : code, o):
+        self.frag_end(c, n, o)
+    def head_begin(self, c : cmd, n : code, o):
+        self.frag_begin(c, n, o)
+    def head_end(self, c : cmd, n : code, o):
         self.frag_end(c, n, o)
     def math_begin(self, c : cmd, n : math, o):
         n.parent.hasmath = True
@@ -1025,7 +1037,8 @@ class html_eng(eng):
             attrs += ' ' + self.indent_attr.format(**{ 'indent' : 3 * f.frag_indent })
         self.outnl((self.html_anchor + \
                     self.html_frag_pair[type(f)][0]).format(**{ 'anchor'  : f.get(html_anchor),
-                                                                'attrs'   : attrs }))
+                                                                'attrs'   : attrs,
+                                                                'level'   : f.get('level', str, '1') }))
         if isinstance(f, img):
             self.outnl(self.html_img.format(**{ 'url' : f.get('url'),
                                                 'width' : f.get('width', str, '50%') }))
@@ -1033,7 +1046,7 @@ class html_eng(eng):
         for c in f.html_cmds:
             self.render_commands[c.opc](self, c, c.node, c.obj)
     def frag_render_end(self, d : deck, c : card, f : frag):
-        self.out(self.html_frag_pair[type(f)][1])
+        self.out(self.html_frag_pair[type(f)][1].format(**{ 'level' : f.get('level', str, '1') }))
     def render_text(self, s : str):
         self.out(html.escape(s))
         
@@ -1076,6 +1089,8 @@ NOTE_BASE    = 26
 NOTE_HERE    = NOTE_BASE + L_HERE
 NOTE_START   = NOTE_BASE + L_START
 NOTE_END     = NOTE_BASE + L_END
+HEAD_BEGIN   = 29
+HEAD_END     = 30
 
 opnames = {
     INVALID      : 'INVALID',
@@ -1087,6 +1102,8 @@ opnames = {
     PARA_END     : 'PARA_END',
     CODE_BEGIN   : 'CODE_BEGIN',
     CODE_END     : 'CODE_END',
+    CODE_BEGIN   : 'HEAD_BEGIN',
+    CODE_END     : 'HEAD_END',
     MATH_BEGIN   : 'MATH_BEGIN',
     MATH_END     : 'MATH_END',
     LSRC_HERE    : 'LSRC_HERE',
