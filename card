@@ -896,7 +896,7 @@ class html_eng(eng):
     def href_wrap(self, target : str, text : str) -> str:
         return self.html_href_pair[0].format(**{ 'ref' : target }) + \
             html.escape(text) + self.html_href_pair[1]
-    def card_row(self, c : card) -> List[str]:
+    def card_row(self, c : card, t0 : str) -> List[str]:
         title = self.href_wrap(c.get(html_file) + '#' + c.get(html_anchor),
                                c.get('card-title', str, None))
         brief = html.escape(c.brief(80) + ' ...')
@@ -905,28 +905,31 @@ class html_eng(eng):
         series = []
         trunks = {}
         for (trunk, z) in c.get(':#', list, []):
-            trunks[trunk] = '+'
+            if t0 != trunk:
+                trunks[trunk] = '+'
         for trunk in sorted(self.deck.series):
-            series += ['<tt>' + trunks.get(trunk, '-') + '</tt>']
+            if t0 != trunk:
+                series += ['<tt>' + trunks.get(trunk, ' ') + '</tt>']
         return [title, brief, tags] + series
-    def series_header(self):
+    def series_header(self, t0 : str):
         out = ''
         for t in sorted(self.deck.series):
-            out += '<th>' + self.href_wrap(self.series_file(t), t) + '</th>'
+            if t != t0:
+                out += '<th>' + self.href_wrap(self.series_file(t), t) + '</th>'
         return out
     def series_trunk(self, trunk : str) -> None:
         sequence = list(self.deck.series[trunk])
         sequence.sort()
         self.out('<table class="no-borders">')
         self.out('<thead><tr><th></th><th>Name</th><th>Brief</th><th>Tags</th>' + \
-                 self.series_header() + '</tr></thead>')
+                 self.series_header(trunk) + '</tr></thead>')
         for zahl in sequence:
             node = self.deck.series[trunk][zahl]
             self.out('<tr>')
             self.out('<td>')
             self.out(html.escape(zahl))
             self.out('</td>')
-            for td in self.card_row(node):
+            for td in self.card_row(node, trunk):
                 self.out('<td>')
                 self.out(td)
                 self.out('</td>')
@@ -935,10 +938,10 @@ class html_eng(eng):
     def tag_list(self, tag : str) -> None:
         self.out('<table class="no-borders">')
         self.out('<thead><tr><th>Name</th><th>Brief</th><th>Tags</th>' + \
-                 self.series_header() + '</tr></thead>')
+                 self.series_header('') + '</tr></thead>')
         for node in self.deck.tags[tag]:
             self.out('<tr>')
-            for td in self.card_row(node):
+            for td in self.card_row(node, ''):
                 self.out('<td>')
                 self.out(td)
                 self.out('</td>')
