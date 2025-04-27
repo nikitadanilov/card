@@ -23,7 +23,6 @@ import collections
 import html
 import re
 import requests
-import random
 from typing import List, Dict, Optional, Tuple
 from typeguard import typechecked # Must be installed.
 
@@ -116,6 +115,7 @@ class frag(node):
         self.lines = []
         self.set(':markers', collections.defaultdict(list))
         self.frag_indent = 0
+        self.html_cmds = []
     def line_add(self, line : str):
         self.lines += [line.rstrip('\n') + ' ']
     def content(self) -> str:
@@ -775,8 +775,7 @@ class html_eng(eng):
     def frag_begin(self, c : cmd, n : frag, o):
         assert o == None
         self.indent += 1
-        n.note_idx = random.randrange(len(self.html_note_colours))
-        n.html_cmds = []
+        n.note_idx = 0
     def frag_end(self, c : cmd, n : frag, o):
         assert o == None
         self.indent -= 1
