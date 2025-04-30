@@ -764,6 +764,7 @@ class html_eng(eng):
         self.commands[c.opc](self, c, c.node, c.obj)
     def file_begin(self, title : str, style : str, anchor : str, math : str, n : node):
         head_matter = '\n'.join(n.join('html.head'))
+        title = ' '.join(n.join('html.title')) + ' ' + title
         self.out(self.html_card_begin.format(**{ 'title'     : title,
                                                  'stylefile' : self.style_file,
                                                  'style'     : style,
