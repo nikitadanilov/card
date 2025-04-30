@@ -612,6 +612,7 @@ class html_eng(eng):
             '   <title>{title}</title>\n'                     +
             '   <link rel="stylesheet" href="{stylefile}">\n' +
             '   <style>{style}</style>\n'                     +
+            '   {head}\n'                                     +
             '   {math}\n'                                     +
             ' </head>\n'                                      +
             ' <body>\n'                                       +
@@ -703,6 +704,11 @@ class html_eng(eng):
         self.html_note_colours = [ 'orange', 'blue', 'red', 'green', 'purple', 'violet' ]
         self.html_note_span = 'span[data-uid="{uid}"] {{ border-color: {colour}; }}'
         self.html_math_script = """
+        <script>window.MathJax = {
+                loader: {load     : ['[tex]/amscd']},
+                tex:    {packages : {'[+]': ['amscd']}}
+        };
+        </script>
         <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>"""
         self.commands = {
             CARD_BEGIN   : html_eng.card_begin,
@@ -756,11 +762,13 @@ class html_eng(eng):
         self.render()
     def exec(self, c : cmd):
         self.commands[c.opc](self, c, c.node, c.obj)
-    def file_begin(self, title : str, style : str, anchor : str, math : str):
+    def file_begin(self, title : str, style : str, anchor : str, math : str, n : node):
+        head_matter = '\n'.join(n.join('html.head'))
         self.out(self.html_card_begin.format(**{ 'title'     : title,
                                                  'stylefile' : self.style_file,
                                                  'style'     : style,
                                                  'anchor'    : anchor,
+                                                 'head'      : head_matter,
                                                  'math'      : math }))
     def card_begin(self, c : cmd, n : card, o):
         assert o == None
@@ -880,24 +888,27 @@ class html_eng(eng):
         return 'tags_' + tag + '.html'
     def series_index(self) -> None:
         for trunk in self.deck.series:
-            self.fd = open(self.series_file(trunk), 'w')
-            self.file_begin('Series ' + trunk, '', '', '')
-            self.series_trunk(trunk)
-            self.out(self.html_card_end)
-            self.fd.close()
+            for [suffix, short] in [['', False], ['_compact', True]]:
+                self.fd = open(self.series_file(trunk + suffix), 'w')
+                self.file_begin('Series ' + trunk, '', '', '', self.deck)
+                self.series_trunk(trunk, short)
+                self.out(self.html_card_end)
+                self.fd.close()
     def tags_index(self) -> None:
         for tag in self.deck.tags:
             self.fd = open(self.tags_file(tag), 'w')
-            self.file_begin('Tag ' + tag, '', '', '')
+            self.file_begin('Tag ' + tag, '', '', '', self.deck)
             self.tag_list(tag)
             self.out(self.html_card_end)
             self.fd.close()
     def href_wrap(self, target : str, text : str) -> str:
         return self.html_href_pair[0].format(**{ 'ref' : target }) + \
             html.escape(text) + self.html_href_pair[1]
-    def card_row(self, c : card, t0 : str) -> List[str]:
+    def card_row(self, c : card, t0 : str, compact : bool) -> List[str]:
         title = self.href_wrap(c.get(html_file) + '#' + c.get(html_anchor),
                                c.get('card-title', str, None))
+        if compact:
+            return [title]
         brief = html.escape(c.brief(80) + ' ...')
         tags  = ' &nbsp; '.join([self.href_wrap(self.tags_file(t), t)
                                  for t in sorted(c.get('tags', list, []))])
@@ -916,19 +927,20 @@ class html_eng(eng):
             if t != t0:
                 out += '<th>' + self.href_wrap(self.series_file(t), t) + '</th>'
         return out
-    def series_trunk(self, trunk : str) -> None:
+    def series_trunk(self, trunk : str, compact : bool) -> None:
         sequence = list(self.deck.series[trunk])
         sequence.sort()
         self.out('<table class="no-borders">')
-        self.out('<thead><tr><th></th><th>Name</th><th>Brief</th><th>Tags</th>' + \
-                 self.series_header(trunk) + '</tr></thead>')
+        if not compact:
+            self.out('<thead><tr><th></th><th>Name</th><th>Brief</th><th>Tags</th>' + \
+                     self.series_header(trunk) + '</tr></thead>')
         for zahl in sequence:
             node = self.deck.series[trunk][zahl]
             self.out('<tr>')
             self.out('<td>')
             self.out(html.escape(zahl))
             self.out('</td>')
-            for td in self.card_row(node, trunk):
+            for td in self.card_row(node, trunk, compact):
                 self.out('<td>')
                 self.out(td)
                 self.out('</td>')
@@ -940,7 +952,7 @@ class html_eng(eng):
                  self.series_header('') + '</tr></thead>')
         for node in self.deck.tags[tag]:
             self.out('<tr>')
-            for td in self.card_row(node, ''):
+            for td in self.card_row(node, '', False):
                 self.out('<td>')
                 self.out(td)
                 self.out('</td>')
@@ -1007,7 +1019,7 @@ class html_eng(eng):
         title = html.escape(c.get('name', str, c.get('label', str, 'Card {}'.format(c.id()))))
         c.set('card-title', title)
         self.file_begin(title, self.style_text(c), c.get(html_anchor, str, None),
-                        self.html_math_script if c.hasmath else '')
+                        self.html_math_script if c.hasmath else '', c)
         if c.hasmath:
             self.out('\n'.join(c.join('TeX')) + '\n')
         self.out('<div class="column">')
