@@ -921,7 +921,7 @@ class html_eng(eng):
         for trunk in sorted(self.deck.series):
             if t0 != trunk:
                 series += ['<tt>' + trunks.get(trunk, ' ') + '</tt>']
-        return [title, brief, tags] + series
+        return [title, brief, tags] # + series
     def series_header(self, t0 : str):
         out = ''
         for t in sorted(self.deck.series):
@@ -934,7 +934,8 @@ class html_eng(eng):
         self.out('<table class="no-borders">')
         if not compact:
             self.out('<thead><tr><th></th><th>Name</th><th>Brief</th><th>Tags</th>' + \
-                     self.series_header(trunk) + '</tr></thead>')
+                     # self.series_header(trunk) + '</tr>' + \
+                     '</thead>')
         for zahl in sequence:
             node = self.deck.series[trunk][zahl]
             self.out('<tr>')
