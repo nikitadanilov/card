@@ -710,6 +710,9 @@ class html_eng(eng):
         };
         </script>
         <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>"""
+        self.html_series_compact_suffix = { True : '_compact', False : '' }
+        self.html_series_reverse_suffix = { True : '_reverse', False : '' }
+        self.html_series_flat_suffix    = { True : '_flat', False : '' }
         self.commands = {
             CARD_BEGIN   : html_eng.card_begin,
             CARD_END     : html_eng.card_end,
@@ -883,19 +886,28 @@ class html_eng(eng):
             for f in c.frags:
                 f.set(html_file, file)
                 f.set(html_anchor, html.escape(f.get(html_anchor, str, f.id())))
+    def series_file_full(self, trunk : str, compact : bool, reverse : bool, flat : bool) -> str:
+        return 'series_' + trunk + \
+            self.html_series_compact_suffix[compact] + \
+            self.html_series_reverse_suffix[reverse] + \
+            self.html_series_flat_suffix[flat] + '.html'
     def series_file(self, trunk : str) -> str:
-        return 'series_' + trunk + '.html'
+        return self.series_file_full(trunk,
+                                     self.deck.get('html.series_compact', str, '') != '',
+                                     self.deck.get('html.series_reverse', str, '') != '',
+                                     self.deck.get('html.series_flat', str, '') != '')
     def tags_file(self, tag : str) -> str:
         return 'tags_' + tag + '.html'
     def series_index(self) -> None:
         for trunk in self.deck.series:
-            for [suffix, short] in [['', False], ['_compact', True]]:
-                for [dsuffix, reverse] in [['', False], ['_reverse', True]]:
-                    self.fd = open(self.series_file(trunk + suffix + dsuffix), 'w')
-                    self.file_begin('Series ' + trunk, '', '', '', self.deck)
-                    self.series_trunk(trunk, short, reverse)
-                    self.out(self.html_card_end)
-                    self.fd.close()
+            for short in [False, True]:
+                for reverse in [False, True]:
+                    for flat in [False, True]:
+                        self.fd = open(self.series_file_full(trunk, short, reverse, flat), 'w')
+                        self.file_begin('Series ' + trunk, '', '', self.html_math_script if flat else '', self.deck)
+                        self.series_trunk(trunk, short, reverse, flat)
+                        self.out(self.html_card_end)
+                        self.fd.close()
     def tags_index(self) -> None:
         for tag in self.deck.tags:
             self.fd = open(self.tags_file(tag), 'w')
@@ -927,12 +939,36 @@ class html_eng(eng):
         out = ''
         for t in sorted(self.deck.series):
             if t != t0:
-                out += '<th>' + self.href_wrap(self.series_file(t + self.deck.get('series_style', str, '')), t) + '</th>'
+                out += '<th>' + self.href_wrap(self.series_file(t), t) + '</th>'
         return out
-    def series_trunk(self, trunk : str, compact : bool, reverse : bool) -> None:
+    def series_trunk(self, trunk : str, compact : bool, reverse : bool, flat : bool) -> None:
         sequence = list(self.deck.series[trunk])
         sequence.sort(reverse = reverse)
         self.out('<table class="no-borders">')
+        self.out('<tr>')
+        self.out('<td>')
+        self.out(self.href_wrap(self.series_file_full(trunk, compact, not reverse, flat),
+                                'reverse'))
+        self.out('</td>')
+        self.out('<td>')
+        self.out(self.href_wrap(self.series_file_full(trunk, not compact, reverse, flat),
+                                'expand' if compact else 'compact'))
+        self.out('</td>')
+        self.out('<td>')
+        self.out(self.href_wrap(self.series_file_full(trunk, compact, reverse, not flat),
+                                'indexed' if flat else 'flat'))
+        self.out('</td>')
+        self.out('</tr>')
+        self.out('</table>')
+        self.out('<table class="no-borders">')
+        if flat:
+            for zahl in sequence:
+                card = self.deck.series[trunk][zahl]
+                self.card_render_begin_file(self.deck, card)
+                self.card_render_frags(self.deck, card)
+                self.card_render_end_file(self.deck, card)
+                self.out('<p>&nbsp;</p>')
+            return
         if not compact:
             self.out('<thead><tr><th></th><th>Name</th><th>Brief</th><th>Tags</th>' + \
                      # self.series_header(trunk) + '</tr>' + \
@@ -999,10 +1035,7 @@ class html_eng(eng):
         self.deck_render_begin(self.deck)
         for c in self.deck.cards:
             self.card_render_begin(self.deck, c)
-            for f in c.frags:
-                self.frag_render_begin(self.deck, c, f)
-                self.frag_render_content(self.deck, c, f)
-                self.frag_render_end(self.deck, c, f)
+            self.card_render_frags(self.deck, c)
             self.card_render_end(self.deck, c)
         self.series_index()
         self.tags_index()
@@ -1017,25 +1050,34 @@ class html_eng(eng):
     def deck_render_end(self, d : deck):
         if self.changedir:
             os.chdir('..')
+    def card_render_begin_file(self, d : deck, c : card):
+        if c.hasmath:
+            self.out('\n'.join(c.join('TeX')) + '\n')
+        self.out('<div class="column">')
+        self.out('<header>')
+        self.out(c.get('card-title', str, 'Card'))
+        self.out('</header>')
     def card_render_begin(self, d : deck, c : card):
         self.fd = open(c.get(html_file, str, None), 'w')
         title = html.escape(c.get('name', str, c.get('label', str, 'Card {}'.format(c.id()))))
         c.set('card-title', title)
         self.file_begin(title, self.style_text(c), c.get(html_anchor, str, None),
                         self.html_math_script if c.hasmath else '', c)
-        if c.hasmath:
-            self.out('\n'.join(c.join('TeX')) + '\n')
-        self.out('<div class="column">')
-        self.out('<header>')
-        self.out(title)
-        self.out('</header>')
-    def card_render_end(self, d : deck, c : card):
+        self.card_render_begin_file(d, c)
+    def card_render_end_file(self, d : deck, c : card):
         self.out('<footer>')
         self.card_render_series(d, c)
         self.out('</footer>')
         self.out('</div>')
+    def card_render_end(self, d : deck, c : card):
+        self.card_render_end_file(d, c)
         self.outnl(self.html_card_end)
         self.fd.close()
+    def card_render_frags(self, d : deck, c : card):
+        for f in c.frags:
+            self.frag_render_begin(self.deck, c, f)
+            self.frag_render_content(self.deck, c, f)
+            self.frag_render_end(self.deck, c, f)
     def card_render_series(self, d : deck, c : card):
         if len(c.series) > 0:
             for (trunk, prev, next) in c.series:
@@ -1045,7 +1087,7 @@ class html_eng(eng):
                 if prev != None:
                     self.href_end()
                 self.out('&nbsp;')
-                self.href_start(c, url_place(None, self.series_file(trunk + d.get('series_style', str, ''))))
+                self.href_start(c, url_place(None, self.series_file(trunk)))
                 self.render_text(trunk)
                 self.href_end()
                 self.out('&nbsp;')
