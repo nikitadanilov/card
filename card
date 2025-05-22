@@ -890,11 +890,12 @@ class html_eng(eng):
     def series_index(self) -> None:
         for trunk in self.deck.series:
             for [suffix, short] in [['', False], ['_compact', True]]:
-                self.fd = open(self.series_file(trunk + suffix), 'w')
-                self.file_begin('Series ' + trunk, '', '', '', self.deck)
-                self.series_trunk(trunk, short)
-                self.out(self.html_card_end)
-                self.fd.close()
+                for [dsuffix, reverse] in [['', False], ['_reverse', True]]:
+                    self.fd = open(self.series_file(trunk + suffix + dsuffix), 'w')
+                    self.file_begin('Series ' + trunk, '', '', '', self.deck)
+                    self.series_trunk(trunk, short, reverse)
+                    self.out(self.html_card_end)
+                    self.fd.close()
     def tags_index(self) -> None:
         for tag in self.deck.tags:
             self.fd = open(self.tags_file(tag), 'w')
@@ -926,11 +927,11 @@ class html_eng(eng):
         out = ''
         for t in sorted(self.deck.series):
             if t != t0:
-                out += '<th>' + self.href_wrap(self.series_file(t), t) + '</th>'
+                out += '<th>' + self.href_wrap(self.series_file(t + self.deck.get('series_style', str, '')), t) + '</th>'
         return out
-    def series_trunk(self, trunk : str, compact : bool) -> None:
+    def series_trunk(self, trunk : str, compact : bool, reverse : bool) -> None:
         sequence = list(self.deck.series[trunk])
-        sequence.sort()
+        sequence.sort(reverse = reverse)
         self.out('<table class="no-borders">')
         if not compact:
             self.out('<thead><tr><th></th><th>Name</th><th>Brief</th><th>Tags</th>' + \
@@ -1044,7 +1045,7 @@ class html_eng(eng):
                 if prev != None:
                     self.href_end()
                 self.out('&nbsp;')
-                self.href_start(c, url_place(None, self.series_file(trunk)))
+                self.href_start(c, url_place(None, self.series_file(trunk + d.get('series_style', str, ''))))
                 self.render_text(trunk)
                 self.href_end()
                 self.out('&nbsp;')
