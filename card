@@ -608,6 +608,9 @@ class html_eng(eng):
             '<!DOCTYPE html>\n'                               + 
             '<html>\n'                                        +
             ' <head>\n'                                       +
+            '   <meta name="viewport"\n'                      +
+            '         content="width=device-width,\n'         +
+            '                  initial-scale=1">\n'           +
             '   <meta charset="UTF-8">\n'                     +
             '   <title>{title}</title>\n'                     +
             '   <link rel="stylesheet" href="{stylefile}">\n' +
