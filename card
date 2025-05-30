@@ -23,6 +23,7 @@ import collections
 import html
 import re
 import requests
+import zlib
 from typing import List, Dict, Optional, Tuple
 from typeguard import typechecked # Must be installed.
 
@@ -790,7 +791,7 @@ class html_eng(eng):
     def frag_begin(self, c : cmd, n : frag, o):
         assert o == None
         self.indent += 1
-        n.note_idx = 0
+        n.note_idx = zlib.crc32(n.id().encode('utf-8')) & 0xFFFFFFFF
     def frag_end(self, c : cmd, n : frag, o):
         assert o == None
         self.indent -= 1
