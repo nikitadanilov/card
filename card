@@ -177,6 +177,7 @@ class card(node):
     def __init__(self, d : deck):
         node.__init__(self, d)
         self.frags = []
+        self.series_id = {}
     def frag_add(self, f : Optional[frag]) -> None:
         if f != None:
             assert(f.parent == self)
@@ -226,7 +227,9 @@ class deck(node):
         trunk = words[0]
         zahl  = words[1] if len(words) > 1 else obj.id()
         assert zahl not in self.series[trunk]
+        assert trunk not in obj.series_id
         self.series[trunk][zahl] = obj
+        obj.series_id[trunk] = zahl
         obj.add(':#', (trunk, zahl))
     def id(self) -> str:
         return 'pleroma'
@@ -615,6 +618,10 @@ class html_eng(eng):
             '   <meta charset="UTF-8">\n'                     +
             '   <title>{title}</title>\n'                     +
             '   <link rel="stylesheet" href="{stylefile}">\n' +
+            '   <link rel="alternate"\n'                      +
+            '         type="application/rss+xml"\n'           +
+            '         title="{decktitle}"\n'                  +
+            '         href="/feed.xml">\n'                    +
             '   <style>{style}</style>\n'                     +
             '   {head}\n'                                     +
             '   {math}\n'                                     +
@@ -775,6 +782,7 @@ class html_eng(eng):
         self.out(self.html_card_begin.format(**{ 'title'     : title,
                                                  'stylefile' : self.style_file,
                                                  'style'     : style,
+                                                 'decktitle' : self.deck.get('deck.title'),
                                                  'anchor'    : anchor,
                                                  'head'      : head_matter,
                                                  'math'      : math }))
@@ -919,6 +927,36 @@ class html_eng(eng):
             self.tag_list(tag)
             self.out(self.html_card_end)
             self.fd.close()
+    def feed(self) -> None:
+        self.fd = open('feed.xml', 'w')
+        self.out(('<?xml version="1.0" encoding="utf-8"?>\n'        +
+                  '<rss version="2.0">\n'                           +
+                  '    <channel>\n'                                 +
+                  '        <title>{title}</title>\n'                +
+                  '        <link>{url}</link>\n'                    +
+                  '        <description>{descr}</description>\n'    +
+                  '        <lastBuildDate>{date}</lastBuildDate>\n' +
+                  '\n').format(**{ 'title' : self.deck.get('deck.title'),
+                                   'url'   : self.deck.get('deck.url'),
+                                   'descr' : self.deck.get('deck.description'),
+                                   'date'  : datetime.datetime.now(datetime.timezone.utc).strftime("%a, %d %b %Y %H:%M:%S %z") }))
+        for c in self.deck.cards:
+            title = html.escape(c.get('card-title', str, 'card'))
+            date = c.series_id.get('timeline', None)
+            if date == None:
+                continue
+            self.out(('        <item>\n'                                 +
+                      '            <title>{title}</title>\n'             +
+                      '            <link>{url}</link>\n'                 +
+                      '            <pubDate>{date}</pubDate>\n'          +
+                      '            <description>{descr}</description>\n' +
+                      '        </item>\n'                                +
+                      '\n').format(**{ 'title' : title,
+                                       'url'   : self.deck.get('deck.url') + '/' + c.get(html_file) + '#' + c.get(html_anchor),
+                                       'date'  : date,
+                                       'descr' : title }))
+        self.out('</channel></rss>')
+        self.fd.close()
     def href_wrap(self, target : str, text : str) -> str:
         return self.html_href_pair[0].format(**{ 'ref' : target }) + \
             html.escape(text) + self.html_href_pair[1]
@@ -1043,6 +1081,7 @@ class html_eng(eng):
             self.card_render_end(self.deck, c)
         self.series_index()
         self.tags_index()
+        self.feed()
         self.deck_render_end(self.deck)
     def deck_render_begin(self, d : deck):
         dir = self.deck.get('dir', str, 'html_out')
