@@ -18,6 +18,7 @@ import sys
 import pprint
 import argparse
 import os
+import io
 import datetime
 import collections
 import html
@@ -222,7 +223,7 @@ class deck(node):
                 assert False
         fd.close()
     def cardseries(self, obj : node, s : str) -> None:
-        words = s.split()
+        words = s.split(maxsplit = 1)
         assert len(words) > 0
         trunk = words[0]
         zahl  = words[1] if len(words) > 1 else obj.id()
@@ -621,7 +622,7 @@ class html_eng(eng):
             '   <link rel="alternate"\n'                      +
             '         type="application/rss+xml"\n'           +
             '         title="{decktitle}"\n'                  +
-            '         href="/feed.xml">\n'                    +
+            '         href="{url}/feed.xml">\n'               +
             '   <style>{style}</style>\n'                     +
             '   {head}\n'                                     +
             '   {math}\n'                                     +
@@ -783,6 +784,7 @@ class html_eng(eng):
                                                  'stylefile' : self.style_file,
                                                  'style'     : style,
                                                  'decktitle' : self.deck.get('deck.title'),
+                                                 'url'       : self.deck.get('deck.url'),
                                                  'anchor'    : anchor,
                                                  'head'      : head_matter,
                                                  'math'      : math }))
@@ -945,16 +947,26 @@ class html_eng(eng):
             date = c.series_id.get('timeline', None)
             if date == None:
                 continue
+            fd = self.fd
+            self.fd = io.StringIO()
+            for f in c.frags:
+                self.frag_render_content(self.deck, c, f)
+            content = self.fd.getvalue()
+            self.fd = fd
             self.out(('        <item>\n'                                 +
                       '            <title>{title}</title>\n'             +
+                      '            <id>{id}</id>\n'                      +
                       '            <link>{url}</link>\n'                 +
                       '            <pubDate>{date}</pubDate>\n'          +
-                      '            <description>{descr}</description>\n' +
+                      '            <content type="html"\n'               +
+                      '                     xml:base="{url}">\n'         +
+                      '                     {content}</content>\n'       +
                       '        </item>\n'                                +
-                      '\n').format(**{ 'title' : title,
-                                       'url'   : self.deck.get('deck.url') + '/' + c.get(html_file) + '#' + c.get(html_anchor),
-                                       'date'  : date,
-                                       'descr' : title }))
+                      '\n').format(**{ 'title'   : title,
+                                       'id'      : c.id(),
+                                       'url'     : self.deck.get('deck.url') + '/' + c.get(html_file) + '#' + c.get(html_anchor),
+                                       'date'    : date[0:10],
+                                       'content' : html.escape(content) }))
         self.out('</channel></rss>')
         self.fd.close()
     def href_wrap(self, target : str, text : str) -> str:
