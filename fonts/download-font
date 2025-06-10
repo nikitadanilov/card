@@ -1,0 +1,8 @@
+#!/bin/sh
+
+url="$1"
+fam="$2"
+for ext in eot woff woff2 ttf svg ;do
+    echo "$url.$ext -> $fam.$ext"
+    curl -o "$fam.$ext" "$url.$ext"
+done
