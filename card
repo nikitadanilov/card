@@ -383,7 +383,12 @@ class span:
     def apply(self, n : node) -> None:
         out     = n.get(':processed', str, n.content())
         markers = n.attrs[':markers']
-        pos     = 0
+        (out, markers) = self.applyto(n, out, markers)
+        n.set(':markers', markers)
+        n.set(':processed', out)
+
+    def applyto(self, n : node, out : str, markers):
+        pos = 0
         if (n.debug(2)):
             print('apply: markers-in', recstring(markers))
         while True:
@@ -408,10 +413,9 @@ class span:
                 markers[idx] = markers[idx] + [cmd]
             for (idx, cmd) in exp:
                 markers[idx] = [cmd] + markers[idx]
-        n.set(':markers', markers)
-        n.set(':processed', out)
         if (n.debug(2)):
             print('apply: markers-ex', recstring(markers))
+        return (out, markers)
 
 class respan(span):
     """Span based on a regular expression."""
@@ -659,6 +663,7 @@ class html_eng(eng):
             'span.annotation span.annotation { padding-bottom:4px; }\n'       +
             'span.annotation span.annotation span.annotation { padding-bottom:6px; }\n' +
             'span.annotation span.annotation span.annotation span.annotation { padding-bottom:8px; }\n' +
+            'span.frag-id { color: #aaaaaa; font-size: 15px; }\n'                  +
             'span.linktarget { border-bottom: 2px solid; }\n'                  +
             '\n' +
             '.column {\n' +
@@ -1153,6 +1158,11 @@ class html_eng(eng):
                     self.href_end()
                 self.out('&nbsp;&nbsp;&nbsp;')
     def frag_render_begin(self, d : deck, c : card, f : frag):
+        if (f.join('frag.id.show') + ['-'])[0] == '+':
+            self.out('<p class="margin-left"><span class="frag-id">')
+            self.out(html.escape('[' + f.id() + ']'))
+            self.out('</span></p>')
+
         for dir in ['left', 'right']:
             def fmt(s : string):
                 return s.format(dir)
