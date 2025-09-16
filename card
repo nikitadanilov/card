@@ -671,6 +671,13 @@ class html_eng(eng):
             '    margin-right: 20%;\n' +
             '    margin-left: 20%;\n' +
             '}\n' +
+            '@media (max-width: 600px) {\n' +
+            '    .column {\n' +
+            '        max-width: 96%;\n' +
+            '        margin-right: 2%;\n' +
+            '        margin-left: 2%;\n' +
+            '    }\n' +
+            '}\n' +
             '.margin-right {\n' +
             '    margin-right: -22%;\n' +
             '    margin-left: 2%;\n' +
