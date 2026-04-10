@@ -40,6 +40,11 @@ class node:
         self.attrs  = {}
         self.incmd  = []
         self.excmd  = []
+        # Explicit node-local compiler state. These replace the old
+        # string-keyed pseudo-attributes such as ':links' and ':spans'.
+        self.links = []
+        self.spans = []
+        self.processed = None
     def set(self, key : str, value) -> None:
         """Sets the attribute. If attribute name starts with '+', then the value
         is added to the list.
@@ -114,7 +119,7 @@ class frag(node):
     def __init__(self, c : card):
         node.__init__(self, c)
         self.lines = []
-        self.set(':markers', collections.defaultdict(list))
+        self.markers = collections.defaultdict(list)
         self.frag_indent = 0
         self.html_cmds = []
     def line_add(self, line : str):
@@ -125,9 +130,9 @@ class frag(node):
         return (self.parent.id() + "-" + self.get('id')) if self.has('id') else self.makeseq(self.parent.id())
     def cut(self):
         """Split the processed content into text segments separated by marker commands."""
-        text = self.get(':processed', str, self.content())
+        text = self.processed if self.processed is not None else self.content()
         last = 0
-        markers = self.attrs.get(':markers', [])
+        markers = self.markers
         if (self.debug(2)):
             print('cut: markers-in ', recstring(markers))
         for idx in sorted(markers):
@@ -372,11 +377,11 @@ def attach_styles(n : node) -> None:
     if not isinstance(n, frag) or isinstance(n, para):
         for s in stylenames:
             for regex in n.join(s):
-                n.add(':spans', stylespan(regex, s))
+                n.spans.append(stylespan(regex, s))
 
 
 def attach_links(n : node) -> None:
-    for place in n.get(':links', list, []):
+    for place in n.links:
         assert place.parent != None
         n.cadd(cmd(place.parent.base(n) + L_HERE, place.parent))
 
@@ -407,7 +412,7 @@ def lower_fragment(f : frag) -> None:
         indent = len(f.get('>', str, ''))
         f.into(cmd(INDENT_BEGIN, indent), cmd(INDENT_END, indent))
     f.into(cmd(cmds[0]), cmd(cmds[1]))
-    for s in f.get(':spans', list, []):
+    for s in f.spans:
         s.apply(f)
     f.cut()
 
@@ -475,11 +480,11 @@ class span:
         assert False # Define in sub-classes!
         
     def apply(self, n : node) -> None:
-        out     = n.get(':processed', str, n.content())
-        markers = n.attrs[':markers']
+        out     = n.processed if n.processed is not None else n.content()
+        markers = n.markers
         (out, markers) = self.applyto(n, out, markers)
-        n.set(':markers', markers)
-        n.set(':processed', out)
+        n.markers = markers
+        n.processed = out
 
     def applyto(self, n : node, out : str, markers):
         pos = 0
@@ -545,7 +550,7 @@ class node_place(place):
     def __init__(self, parent : Optional[link], n : node):
         self.node = n
         self.parent = parent
-        self.node.add(':links', self)
+        self.node.links.append(self)
     def __str__(self) -> str:
         return 'node: ' + self.node.id()
 
@@ -580,7 +585,7 @@ class span_place(place):
         self.span   = span_place.link_span(self, pattern)
         self.base   = base
         self.pattern = pattern
-        self.node.add(':spans', self.span)
+        self.node.spans.append(self.span)
     def __str__(self) -> str:
         return 'span_place: "' + self.pattern + '"'
     def __repr__(self) -> str:
