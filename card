@@ -268,7 +268,7 @@ class deck(node):
             para : (PARA_BEGIN, PARA_END),
             math : (MATH_BEGIN, MATH_END),
             code : (CODE_BEGIN, CODE_END),
-            code : (HEAD_BEGIN, HEAD_END)
+            head : (HEAD_BEGIN, HEAD_END)
         }
         # Pass 0: build identifiers index, it is needed to resolve link names, etc. later.
         self.tagid(self)
@@ -825,9 +825,9 @@ class html_eng(eng):
         self.frag_begin(c, n, o)
     def code_end(self, c : cmd, n : code, o):
         self.frag_end(c, n, o)
-    def head_begin(self, c : cmd, n : code, o):
+    def head_begin(self, c : cmd, n : head, o):
         self.frag_begin(c, n, o)
-    def head_end(self, c : cmd, n : code, o):
+    def head_end(self, c : cmd, n : head, o):
         self.frag_end(c, n, o)
     def math_begin(self, c : cmd, n : math, o):
         n.parent.hasmath = True
