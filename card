@@ -209,146 +209,32 @@ class deck(node):
         self.ids    = {}
         self.tags   = collections.defaultdict(list)
         self.series = collections.defaultdict(dict)
+
     def card_add(self, c : card) -> None:
         assert c.parent == self
         self.cards += [c]
-    def configread(self, file : str) -> None:
-        fd  = open(file, 'r')
-        for line in fd:
-            words = line.strip().split(maxsplit = 2)
-            if words[0] == '/':
-                self.set(words[1], words[2])
-            else:
-                assert False
-        fd.close()
-    def cardseries(self, obj : node, s : str) -> None:
-        words = s.split(maxsplit = 1)
-        assert len(words) > 0
-        trunk = words[0]
-        zahl  = words[1] if len(words) > 1 else obj.id()
-        assert zahl not in self.series[trunk]
-        assert trunk not in obj.series_id
-        self.series[trunk][zahl] = obj
-        obj.series_id[trunk] = zahl
-        obj.add(':#', (trunk, zahl))
+
     def id(self) -> str:
         return 'pleroma'
-    def tagid(self, obj : node) -> None:
-        assert obj.id() not in self.ids   # Identifier must be unique.
-        self.ids[obj.id()] = obj
-        for t in obj.get('tags', list, []):
-            self.tags[t] += [obj]
-        for s in obj.get('#', list, []):
-            self.cardseries(obj, s)
-    def makelinks(self, n : node):
-        for l in n.join('='):           # Make links
-            link(self, n, l)
-        for x in n.get('*', list, []):  # Make notes
-            note(self, n, x)
-    def addstyles(self, n : node):
-        # Only apply styles to paras. This should be done more generically.
-        if not isinstance(n, frag) or isinstance(n, para):
-            for s in stylenames:
-                for regex in n.join(s):
-                    n.add(':spans', stylespan(regex, s))
-    def addlinks(self, n : node):
-        for place in n.get(':links', list, []):
-            assert place.parent != None
-            n.cadd(cmd(place.parent.base(n) + L_HERE, place.parent))
-    def addseries(self, c : card):
-        for (trunk, zahl) in c.get(':#', list, []):
-            sequence = list(self.series[trunk])
-            sequence.sort()
-            pos = sequence.index(zahl)
-            c.cadd(cmd(SERIES, (trunk, self.series[trunk][sequence[pos - 1]] if pos > 0 else None,
-                                       self.series[trunk][sequence[pos + 1]] if pos + 1 < len(sequence) else None)))
-    def crossref(self) -> None:
-        frag_cmds = {
-            para : (PARA_BEGIN, PARA_END),
-            math : (MATH_BEGIN, MATH_END),
-            code : (CODE_BEGIN, CODE_END),
-            head : (HEAD_BEGIN, HEAD_END)
-        }
-        # Pass 0: build identifiers index, it is needed to resolve link names, etc. later.
-        self.tagid(self)
-        for c in self.cards:
-            self.tagid(c)
-            for f in c.frags:
-                self.tagid(f)
-        # Pass 1: build the links
-        for c in self.cards:
-            self.makelinks(c)
-            for f in c.frags:
-                self.makelinks(f)
-        # Pass 2: build the command tree
-        self.addlinks(self)
-        self.addstyles(self)
-        for c in self.cards:
-            self.addlinks(c)
-            self.addseries(c)
-            self.addstyles(c)
-            for f in c.frags:
-                self.addlinks(f)
-                self.addstyles(f)
-                cmds = frag_cmds.get(type(f), (FRAG_BEGIN, FRAG_END))
-                if f.has('>'):
-                    indent = len(f.get('>', str, ''))
-                    f.into(cmd(INDENT_BEGIN, indent), cmd(INDENT_END, indent))
-                f.into(cmd(cmds[0]), cmd(cmds[1]))
-                for s in f.get(':spans', list, []):
-                    s.apply(f)
-                f.cut()
-            c.pair(cmd(CARD_BEGIN), cmd(CARD_END))
-        self.pair(cmd(BEGIN), cmd(END))
+
     def program(self):
         """Build the program by traversing the node tree."""
         return self.incmd + sum([c.program() for c in self.cards], []) + self.excmd
+
+    # Compatibility wrappers. The actual pipeline lives in the semantic-pass
+    # section below, so that the deck object remains mostly passive.
+    def configread(self, file : str) -> None:
+        read_config(self, file)
+
+    def crossref(self) -> None:
+        compile_deck(self)
+
     def build(self) -> None:
-        # print('\n'.join([str(x) for x in self.program()]))
-        engines[self.get('engine', str, 'html')]().run(self, self.program())
-    def cardread(self : deck, file : str) -> None:
-        seq = 0
-        fd  = open(file, 'r')
-        c   = card.fromfile(self, file, fd, seq)
-        f   = None
-        for rawline in fd:
-            line = rawline.strip()
-            words = line.split(maxsplit = 2)
-            if len(line) == 0:
-                c.frag_add(f)
-                f = None
-            elif words[0] == '///':          # Deck attribute
-                self.set(words[1], words[2]) 
-            elif words[0] == '//':           # Card attribute
-                c.set(words[1], words[2])
-            elif words[0] == '/':            # Fragment attribute
-                assert f != None
-                f.set(words[1], words[2])
-            elif words[0] == ';':            # Fragment type
-                c.frag_add(f)
-                f = frag_types[words[1]](c)
-            elif words[0] == '\\':           # New card
-                c.frag_add(f)
-                self.card_add(c);
-                seq = seq + 1
-                c = card.fromfile(self, file, fd, seq)
-                f = None
-            else:
-                if f == None:
-                    f = para(c)
-                if rawline[0] == '|':        # Continuation
-                    rawline = rawline[1:]
-                else:
-                    indent = 0
-                    while rawline[0] == '>':
-                        indent += 1
-                        rawline = rawline[1:]
-                    if indent != 0:
-                        f.set('>', indent * '>')
-                f.line_add(rawline)
-        c.frag_add(f)
-        self.card_add(c);
-        fd.close()
+        render_deck(self)
+
+    def cardread(self, file : str) -> None:
+        read_card_file(self, file)
+
     def tostring(self) -> List[str]:
         return [''] + \
             ['<dock'] + \
@@ -360,6 +246,215 @@ class deck(node):
             ['--cards--'] + \
             self.indent(8, sum([c.tostring() + ['********'] for c in self.cards], [])) + \
             ['>']
+
+
+# ----------------------------------------------------------------------
+# Parsing
+# ----------------------------------------------------------------------
+
+def read_config(d : deck, file : str) -> None:
+    fd = open(file, 'r')
+    for line in fd:
+        words = line.strip().split(maxsplit = 2)
+        if words[0] == '/':
+            d.set(words[1], words[2])
+        else:
+            assert False
+    fd.close()
+
+
+def read_card_file(d : deck, file : str) -> None:
+    seq = 0
+    fd  = open(file, 'r')
+    c   = card.fromfile(d, file, fd, seq)
+    f   = None
+    for rawline in fd:
+        line = rawline.strip()
+        words = line.split(maxsplit = 2)
+        if len(line) == 0:
+            c.frag_add(f)
+            f = None
+        elif words[0] == '///':          # Deck attribute
+            d.set(words[1], words[2])
+        elif words[0] == '//':           # Card attribute
+            c.set(words[1], words[2])
+        elif words[0] == '/':            # Fragment attribute
+            assert f != None
+            f.set(words[1], words[2])
+        elif words[0] == ';':            # Fragment type
+            c.frag_add(f)
+            f = frag_types[words[1]](c)
+        elif words[0] == '\\':         # New card
+            c.frag_add(f)
+            d.card_add(c)
+            seq = seq + 1
+            c = card.fromfile(d, file, fd, seq)
+            f = None
+        else:
+            if f == None:
+                f = para(c)
+            if rawline[0] == '|':        # Continuation
+                rawline = rawline[1:]
+            else:
+                indent = 0
+                while rawline[0] == '>':
+                    indent += 1
+                    rawline = rawline[1:]
+                if indent != 0:
+                    f.set('>', indent * '>')
+            f.line_add(rawline)
+    c.frag_add(f)
+    d.card_add(c)
+    fd.close()
+
+
+# ----------------------------------------------------------------------
+# Semantic passes
+# ----------------------------------------------------------------------
+
+def iter_card_nodes(d : deck):
+    for c in d.cards:
+        yield c
+        for f in c.frags:
+            yield f
+
+
+def iter_fragments(d : deck):
+    for c in d.cards:
+        for f in c.frags:
+            yield f
+
+
+def register_series_membership(d : deck, obj : node, spec : str) -> None:
+    words = spec.split(maxsplit = 1)
+    assert len(words) > 0
+    trunk = words[0]
+    zahl  = words[1] if len(words) > 1 else obj.id()
+    assert zahl not in d.series[trunk]
+    assert trunk not in obj.series_id
+    d.series[trunk][zahl] = obj
+    obj.series_id[trunk] = zahl
+    obj.add(':#', (trunk, zahl))
+
+
+def index_node(d : deck, obj : node) -> None:
+    assert obj.id() not in d.ids   # Identifier must be unique.
+    d.ids[obj.id()] = obj
+    for t in obj.get('tags', list, []):
+        d.tags[t] += [obj]
+    for s in obj.get('#', list, []):
+        register_series_membership(d, obj, s)
+
+
+def index_nodes(d : deck) -> None:
+    d.ids = {}
+    d.tags = collections.defaultdict(list)
+    d.series = collections.defaultdict(dict)
+    index_node(d, d)
+    for obj in iter_card_nodes(d):
+        index_node(d, obj)
+
+
+def build_node_links(d : deck, n : node) -> None:
+    for l in n.join('='):
+        link(d, n, l)
+    for x in n.get('*', list, []):
+        note(d, n, x)
+
+
+def build_links(d : deck) -> None:
+    for n in iter_card_nodes(d):
+        build_node_links(d, n)
+
+
+def attach_styles(n : node) -> None:
+    # Only apply styles to paras. This should be done more generically.
+    if not isinstance(n, frag) or isinstance(n, para):
+        for s in stylenames:
+            for regex in n.join(s):
+                n.add(':spans', stylespan(regex, s))
+
+
+def attach_links(n : node) -> None:
+    for place in n.get(':links', list, []):
+        assert place.parent != None
+        n.cadd(cmd(place.parent.base(n) + L_HERE, place.parent))
+
+
+def attach_series_navigation(d : deck, c : card) -> None:
+    for (trunk, zahl) in c.get(':#', list, []):
+        sequence = list(d.series[trunk])
+        sequence.sort()
+        pos = sequence.index(zahl)
+        c.cadd(cmd(SERIES, (trunk,
+                            d.series[trunk][sequence[pos - 1]] if pos > 0 else None,
+                            d.series[trunk][sequence[pos + 1]] if pos + 1 < len(sequence) else None)))
+
+
+def frag_commands_for(f : frag):
+    frag_cmds = {
+        para : (PARA_BEGIN, PARA_END),
+        math : (MATH_BEGIN, MATH_END),
+        code : (CODE_BEGIN, CODE_END),
+        head : (HEAD_BEGIN, HEAD_END)
+    }
+    return frag_cmds.get(type(f), (FRAG_BEGIN, FRAG_END))
+
+
+def lower_fragment(f : frag) -> None:
+    cmds = frag_commands_for(f)
+    if f.has('>'):
+        indent = len(f.get('>', str, ''))
+        f.into(cmd(INDENT_BEGIN, indent), cmd(INDENT_END, indent))
+    f.into(cmd(cmds[0]), cmd(cmds[1]))
+    for s in f.get(':spans', list, []):
+        s.apply(f)
+    f.cut()
+
+
+def attach_node_decorations(d : deck) -> None:
+    attach_links(d)
+    attach_styles(d)
+    for c in d.cards:
+        attach_links(c)
+        attach_series_navigation(d, c)
+        attach_styles(c)
+        for f in c.frags:
+            attach_links(f)
+            attach_styles(f)
+
+
+def lower_fragments(d : deck) -> None:
+    for f in iter_fragments(d):
+        lower_fragment(f)
+
+
+def wrap_cards(d : deck) -> None:
+    for c in d.cards:
+        c.pair(cmd(CARD_BEGIN), cmd(CARD_END))
+
+
+def wrap_deck(d : deck) -> None:
+    d.pair(cmd(BEGIN), cmd(END))
+
+
+def compile_deck(d : deck) -> None:
+    # Pass 0: build identifiers index, needed to resolve links and series.
+    index_nodes(d)
+    # Pass 1: instantiate link and note objects from declarative attributes.
+    build_links(d)
+    # Pass 2: attach command-level decorations.
+    attach_node_decorations(d)
+    # Pass 3: lower fragments to command streams.
+    lower_fragments(d)
+    # Pass 4: wrap structural nodes.
+    wrap_cards(d)
+    wrap_deck(d)
+
+
+def render_deck(d : deck) -> None:
+    # print('\n'.join([str(x) for x in d.program()]))
+    engines[d.get('engine', str, 'html')]().run(d, d.program())
 
 class span:
     """A span is a pattern of contiguous extent of text decorated in some way.
