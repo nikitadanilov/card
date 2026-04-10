@@ -128,20 +128,29 @@ class frag(node):
         return ''.join(self.lines).strip()
     def id(self) -> str:
         return (self.parent.id() + "-" + self.get('id')) if self.has('id') else self.makeseq(self.parent.id())
-    def cut(self):
-        """Split the processed content into text segments separated by marker commands."""
-        text = self.processed if self.processed is not None else self.content()
+    def cut(self, text : Optional[str] = None, markers = None):
+        """Split content into text segments separated by marker commands.
+
+        This is a pure helper: it returns the resulting command list without
+        mutating fragment state.
+        """
+        text = self.processed if text is None else text
+        if text is None:
+            text = self.content()
+        markers = self.markers if markers is None else markers
         last = 0
-        markers = self.markers
+        out = []
         if (self.debug(2)):
             print('cut: markers-in ', recstring(markers))
         for idx in sorted(markers):
             if idx > 0:
-                self.cadd(cmd(TEXT, text[last : idx]))
+                out += [cmd(TEXT, text[last : idx], self)]
             for c in markers[idx]:
-                self.cadd(c)
+                c.node = self
+                out += [c]
             last = idx
-        self.cadd(cmd(TEXT, text[last:]))
+        out += [cmd(TEXT, text[last:], self)]
+        return out
     def program(self):
         return self.incmd + self.excmd
     def tostring(self) -> List[str]:
@@ -417,15 +426,25 @@ def frag_commands_for(f : frag):
     return frag_cmds.get(type(f), (FRAG_BEGIN, FRAG_END))
 
 
-def lower_fragment(f : frag) -> None:
-    cmds = frag_commands_for(f)
+def lower_fragment(f : frag) -> List[cmd]:
+    out = []
+    (begin, end) = frag_commands_for(f)
+    out += [cmd(begin, None, f)]
     if f.has('>'):
         indent = len(f.get('>', str, ''))
-        f.into(cmd(INDENT_BEGIN, indent), cmd(INDENT_END, indent))
-    f.into(cmd(cmds[0]), cmd(cmds[1]))
+        out += [cmd(INDENT_BEGIN, indent, f)]
+
+    text = f.content()
+    markers = collections.defaultdict(list)
     for s in f.spans:
-        s.apply(f)
-    f.cut()
+        (text, markers) = s.applyto(f, text, markers)
+    out += f.cut(text, markers)
+
+    if f.has('>'):
+        indent = len(f.get('>', str, ''))
+        out += [cmd(INDENT_END, indent, f)]
+    out += [cmd(end, None, f)]
+    return out
 
 
 def attach_node_decorations(d : deck) -> None:
@@ -442,7 +461,8 @@ def attach_node_decorations(d : deck) -> None:
 
 def lower_fragments(d : deck) -> None:
     for f in iter_fragments(d):
-        lower_fragment(f)
+        f.incmd = lower_fragment(f)
+        f.excmd = []
 
 
 def wrap_cards(d : deck) -> None:
