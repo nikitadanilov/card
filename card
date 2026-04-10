@@ -23,7 +23,6 @@ import datetime
 import collections
 import html
 import re
-import requests
 import zlib
 from typing import List, Dict, Optional, Tuple
 from typeguard import typechecked # Must be installed.
