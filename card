@@ -40,6 +40,7 @@ class node:
         self.attrs  = {}
         self.incmd  = []
         self.excmd  = []
+        self.series_id = {}
         # Explicit node-local compiler state. These replace the old
         # string-keyed pseudo-attributes such as ':links' and ':spans'.
         self.links = []
@@ -122,12 +123,18 @@ class frag(node):
         self.markers = collections.defaultdict(list)
         self.frag_indent = 0
         self.html_cmds = []
+        self.notes = []
     def line_add(self, line : str):
         self.lines += [line.rstrip('\n') + ' ']
     def content(self) -> str:
         return ''.join(self.lines).strip()
     def id(self) -> str:
         return (self.parent.id() + "-" + self.get('id')) if self.has('id') else self.makeseq(self.parent.id())
+    def note_add(self, n : Optional['note']) -> None:
+        if n != None:
+            assert n.parent == self
+            n.set('seq', len(self.notes))
+            self.notes += [n]
     def cut(self, text : Optional[str] = None, markers = None):
         """Split content into text segments separated by marker commands.
 
@@ -154,7 +161,7 @@ class frag(node):
     def program(self):
         return self.incmd + self.excmd
     def tostring(self) -> List[str]:
-        return super().tostring() + ['{'] + self.indent(8, self.lines) + ['}']
+        return super().tostring() + ['{'] + self.indent(8, self.lines) + ['--notes--'] + self.indent(8, sum([n.tostring() for n in self.notes], [])) + ['}']
 
 @typechecked
 class para(frag):
@@ -178,6 +185,54 @@ class img(frag):
 class head(frag):
     pass
 
+@typechecked
+class note(node):
+    def __init__(self, f : frag, s : str):
+        node.__init__(self, f)
+        self.lines = []
+        self.markers = collections.defaultdict(list)
+        self.html_cmds = []
+        self.place = None
+        self.src = self
+        self.idx = None
+        self.quoted = False
+        self.br = True
+        self.parse(s)
+    def parse(self, s : str) -> None:
+        s = s.lstrip()
+        assert s[0] == '"'
+        parts = s[1:].split('"', 1)
+        self.place = span_place(self, self.parent, parts[0], NOTE_BASE)
+        self.line_add(parts[1])
+    def line_add(self, line : str):
+        self.lines += [line.rstrip('\n') + ' ']
+    def content(self) -> str:
+        return ''.join(self.lines).strip()
+    def id(self) -> str:
+        return (self.parent.id() + '-' + self.get('id')) if self.has('id') else self.makeseq(self.parent.id() + '-note')
+    def cut(self, text : Optional[str] = None, markers = None):
+        text = self.processed if text is None else text
+        if text is None:
+            text = self.content()
+        markers = self.markers if markers is None else markers
+        out = []
+        last = 0
+        if (self.debug(2)):
+            print('cut: markers-in ', recstring(markers))
+        for idx in sorted(markers):
+            if idx > last:
+                out += [cmd(TEXT, text[last : idx], self)]
+            for c in markers[idx]:
+                c.node = self
+                out += [c]
+            last = idx
+        out += [cmd(TEXT, text[last:], self)]
+        return out
+    def program(self):
+        return self.incmd + self.excmd
+    def tostring(self) -> List[str]:
+        return super().tostring() + ['<note>'] + self.indent(8, self.lines) + ['</note>']
+
 frag_types = {
     'para' : para,
     'code' : code,
@@ -191,7 +246,6 @@ class card(node):
     def __init__(self, d : deck):
         node.__init__(self, d)
         self.frags = []
-        self.series_id = {}
     def frag_add(self, f : Optional[frag]) -> None:
         if f != None:
             assert(f.parent == self)
@@ -282,29 +336,44 @@ def read_card_file(d : deck, file : str) -> None:
     fd  = open(file, 'r')
     c   = card.fromfile(d, file, fd, seq)
     f   = None
+    current_note = None
     for rawline in fd:
         line = rawline.strip()
         words = line.split(maxsplit = 2)
         if len(line) == 0:
             c.frag_add(f)
             f = None
+            current_note = None
         elif words[0] == '///':          # Deck attribute
             d.set(words[1], words[2])
+            current_note = None
         elif words[0] == '//':           # Card attribute
             c.set(words[1], words[2])
-        elif words[0] == '/':            # Fragment attribute
+            current_note = None
+        elif words[0] == '/':            # Fragment attribute / note creation
             assert f != None
-            f.set(words[1], words[2])
+            if len(words) > 1 and words[1] == '+*':
+                current_note = note(f, words[2])
+                f.note_add(current_note)
+            else:
+                f.set(words[1], words[2])
+                current_note = None
+        elif words[0] == ':':            # Note attribute
+            assert current_note != None
+            current_note.set(words[1], words[2])
         elif words[0] == ';':            # Fragment type
             c.frag_add(f)
             f = frag_types[words[1]](c)
+            current_note = None
         elif words[0] == '\\':         # New card
             c.frag_add(f)
             d.card_add(c)
             seq = seq + 1
             c = card.fromfile(d, file, fd, seq)
             f = None
+            current_note = None
         else:
+            current_note = None
             if f == None:
                 f = para(c)
             if rawline[0] == '|':        # Continuation
@@ -336,12 +405,20 @@ def iter_fragments(d : deck):
             yield f
 
 
+def iter_notes(d : deck):
+    for f in iter_fragments(d):
+        for n in f.notes:
+            yield n
+
+
 def iter_nodes(d : deck):
     yield d
     for c in iter_cards(d):
         yield c
         for f in c.frags:
             yield f
+            for n in f.notes:
+                yield n
 
 
 def iter_card_nodes(d : deck):
@@ -382,8 +459,6 @@ def index_nodes(d : deck) -> None:
 def build_node_links(d : deck, n : node) -> None:
     for l in n.join('='):
         link(d, n, l)
-    for x in n.get('*', list, []):
-        note(d, n, x)
 
 
 def build_links(d : deck) -> None:
@@ -457,12 +532,27 @@ def attach_node_decorations(d : deck) -> None:
     for f in iter_fragments(d):
         attach_links(f)
         attach_styles(f)
+    for n in iter_notes(d):
+        attach_links(n)
+        attach_styles(n)
+
+
+def lower_inline_node(n : note) -> List[cmd]:
+    text = n.content()
+    markers = collections.defaultdict(list)
+    for s in n.spans:
+        (text, markers) = s.applyto(n, text, markers)
+    return n.cut(text, markers)
 
 
 def lower_fragments(d : deck) -> None:
     for f in iter_fragments(d):
         f.incmd = lower_fragment(f)
         f.excmd = []
+    for n in iter_notes(d):
+        n.incmd = lower_inline_node(n)
+        n.excmd = []
+        n.html_cmds = n.incmd
 
 
 def wrap_cards(d : deck) -> None:
@@ -715,20 +805,6 @@ class link:
         return self.src.__str__() + ' -> ' + self.tgt.__str__()
     def __repr__(self) -> str:
         return self.__str__()
-
-@typechecked
-class note:
-    def __init__(self, d : deck, obj : node, s : str):
-        s = s.lstrip()
-        assert s[0] == '"'
-        parts = s[1:].split('"', 1)
-        self.text = parts[1]
-        self.place = span_place(self, obj, parts[0], NOTE_BASE)
-        self.src = self
-        self.idx = None
-        self.quoted = False
-        obj.add(':notes', self)
-        
 
 @typechecked
 class eng:
@@ -1042,6 +1118,9 @@ class html_eng(eng):
             for f in c.frags:
                 f.set(html_file, file)
                 f.set(html_anchor, html.escape(f.get(html_anchor, str, f.id())))
+                for n in f.notes:
+                    n.set(html_file, file)
+                    n.set(html_anchor, html.escape(n.get(html_anchor, str, n.id())))
     def series_file_full(self, trunk : str, compact : bool, reverse : bool, flat : bool) -> str:
         return 'series_' + trunk + \
             self.html_series_compact_suffix[compact] + \
@@ -1294,6 +1373,10 @@ class html_eng(eng):
                 if next != None:
                     self.href_end()
                 self.out('&nbsp;&nbsp;&nbsp;')
+    def render_inline_node(self, n : node):
+        for c in n.incmd:
+            self.render_commands[c.opc](self, c, c.node, c.obj)
+
     def frag_render_begin(self, d : deck, c : card, f : frag):
         if (f.join('frag.id.show') + ['-'])[0] == '+':
             self.out('<p class="margin-left"><span class="frag-id">')
@@ -1301,13 +1384,16 @@ class html_eng(eng):
             self.out('</span></p>')
 
         for dir in ['left', 'right']:
-            def fmt(s : string):
+            def fmt(s : str):
                 return s.format(dir)
             if f.has(fmt(':html-note-{}')):
                 self.out(fmt('<p class="margin-{}">'))
                 for m in f.get(fmt(':html-note-{}'), list, []):
                     self.out('<span class="annotation" data-uid="{}">'.format(m.idx % len(self.html_note_colours)))
-                    self.out(m.text) if m.quoted else self.render_text(m.text)
+                    if isinstance(m, note):
+                        self.render_inline_node(m)
+                    else:
+                        self.out(m.text) if m.quoted else self.render_text(m.text)
                     self.out('</span>&nbsp;')
                     self.out('<br>') if m.br else None
                 self.out('</p>')
