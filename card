@@ -317,17 +317,28 @@ def read_card_file(d : deck, file : str) -> None:
 # Semantic passes
 # ----------------------------------------------------------------------
 
-def iter_card_nodes(d : deck):
-    for c in d.cards:
+def iter_cards(d : deck):
+    return iter(d.cards)
+
+
+def iter_fragments(d : deck):
+    for c in iter_cards(d):
+        for f in c.frags:
+            yield f
+
+
+def iter_nodes(d : deck):
+    yield d
+    for c in iter_cards(d):
         yield c
         for f in c.frags:
             yield f
 
 
-def iter_fragments(d : deck):
-    for c in d.cards:
-        for f in c.frags:
-            yield f
+def iter_card_nodes(d : deck):
+    for n in iter_nodes(d):
+        if n is not d:
+            yield n
 
 
 def register_series_membership(d : deck, obj : node, spec : str) -> None:
@@ -355,8 +366,7 @@ def index_nodes(d : deck) -> None:
     d.ids = {}
     d.tags = collections.defaultdict(list)
     d.series = collections.defaultdict(dict)
-    index_node(d, d)
-    for obj in iter_card_nodes(d):
+    for obj in iter_nodes(d):
         index_node(d, obj)
 
 
@@ -368,8 +378,9 @@ def build_node_links(d : deck, n : node) -> None:
 
 
 def build_links(d : deck) -> None:
-    for n in iter_card_nodes(d):
-        build_node_links(d, n)
+    for n in iter_nodes(d):
+        if n is not d:
+            build_node_links(d, n)
 
 
 def attach_styles(n : node) -> None:
@@ -420,13 +431,13 @@ def lower_fragment(f : frag) -> None:
 def attach_node_decorations(d : deck) -> None:
     attach_links(d)
     attach_styles(d)
-    for c in d.cards:
+    for c in iter_cards(d):
         attach_links(c)
         attach_series_navigation(d, c)
         attach_styles(c)
-        for f in c.frags:
-            attach_links(f)
-            attach_styles(f)
+    for f in iter_fragments(d):
+        attach_links(f)
+        attach_styles(f)
 
 
 def lower_fragments(d : deck) -> None:
@@ -435,7 +446,7 @@ def lower_fragments(d : deck) -> None:
 
 
 def wrap_cards(d : deck) -> None:
-    for c in d.cards:
+    for c in iter_cards(d):
         c.pair(cmd(CARD_BEGIN), cmd(CARD_END))
 
 
