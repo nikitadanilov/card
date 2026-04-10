@@ -510,8 +510,8 @@ class cmdspan(respan):
             if start > 0:
                 out += s[last : start]
             orig = m.group(aname)
-            repl = replacement.format(orig)
             if replacement != None:
+                repl = replacement.format(orig)
                 out += repl
                 deltas += [(len(out), len(repl) - len(orig))]
             else:
