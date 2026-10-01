@@ -584,15 +584,13 @@ class TestLinks(CardTest):
         b = self.build(STYLES + '// id c\nSee _word_ here.\n/ += . "_word_" -> https://example.com\n')
         self.assertIn('<a href="https://example.com"><i>word</i></a>', b.body('c.html'))
 
-    @unittest.expectedFailure # Known bug.
     def test_link_regex_matching_empty_string_terminates(self):
         b = self.build('// id c\nabc\n/ += . "z*" -> https://example.com\n')
-        self.assertIn('abc', b.body('c.html'))
+        self.assertIn('<p>abc</p>', b.body('c.html'))
 
-    @unittest.expectedFailure # Known bug.
     def test_style_regex_matching_empty_string_terminates(self):
-        b = self.build('/// +it (?P<open>)z*(?P<close>)\n// id c\nabc\n')
-        self.assertIn('abc', b.body('c.html'))
+        b = self.build('/// +it (?P<open>)z*(?P<close>)\n// id c\nabc z\n')
+        self.assertIn('<p>abc <i>z</i></p>', b.body('c.html'))
 
 # ----------------------------------------------------------------------
 # Notes

@@ -610,6 +610,11 @@ class span:
             m = self.find(out, pos)
             if m == None:
                 break
+            if m.start() == m.end(): # Ignore empty matches.
+                if m.end() >= len(out):
+                    break
+                pos = m.end() + 1
+                continue
             (out, pos, deltas, inp, exp) = self.transform(out, m)
             if (n.debug(3)):
                 print('    out', out, '\n    pos', pos, '\n    deltas', recstring(deltas),

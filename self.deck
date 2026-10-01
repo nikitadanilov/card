@@ -1103,9 +1103,8 @@ Common errors and known limitations:
 > – Tags and series positions on fragments are not supported: card fails
   with a TypeCheckError. Tag cards and put cards in series only.
 
-> – A regular expression (of a link, a note or a style) that can match the
-  empty string, such as "x*", makes card loop forever. Make sure every
-  expression matches at least one character.
+> – Empty matches of regular expressions (of links, notes and styles) are
+  ignored: "x*" decorates only non-empty runs of "x".
 
 > – A card in the "timeline" series without the `deck.url` deck attribute fails
   when the RSS feed is generated. Without `deck.url`, the reference to the
