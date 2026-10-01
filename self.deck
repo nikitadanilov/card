@@ -148,8 +148,8 @@ The first line is a deck attribute, telling card to put the output into the
 "out" directory (the default is "html_out"). The next two lines are attributes
 of the (only) card: its title and its identifier. Then comes a paragraph with
 a link attached to the word "world", followed by a code display. The output
-directory now contains hello.html with the rendered card, the style sheet
-style.css and the RSS feed feed.xml (see HTML output).
+directory now contains hello.html with the rendered card and the style sheet
+style.css (see HTML output).
 / += . "HTML output" -> !html-top
 
 Note that "_very_" was not italicised: conventions such as underscores for
@@ -168,8 +168,8 @@ Have a look at both files: they are the most complete example of card usage.
 / += . "self.deck" -> https://github.com/nikitadanilov/card/blob/master/self.deck
 
 If the deck is going to be published, also set the `deck.url` deck attribute
-to the URL of the output directory. Every page refers to the RSS feed as
-deck.url/feed.xml, and without the attribute this reference is broken.
+to the URL of the output directory. Only then does card generate the RSS feed
+feed.xml and refer to it from every page.
 
 \
 
@@ -390,9 +390,9 @@ Deck attributes:
 
 > `deck.description`: the description of the deck, used in the RSS feed.
 
-> `deck.url`: the public URL of the output directory. Used to refer to the RSS
-  feed from every page and in the feed itself. Required if any card is in the
-  "timeline" series (see Series and tags).
+> `deck.url`: the public URL of the output directory. If it is set, the RSS
+  feed is generated, and every page refers to it. Required if any card is in
+  the "timeline" series (see Series and tags).
 / += . "Series and tags" -> !series-top
 
 > `html.style` [list]: CSS appended to the generated style sheet. See HTML
@@ -910,14 +910,14 @@ contains:
 
 > – an index file tags_TAG.html for each tag;
 
-> – feed.xml, the RSS feed (see Series and tags).
+> – feed.xml, the RSS feed, if `deck.url` is set (see Series and tags).
 / += . "Series and tags" -> !series-top
 
 Each card is rendered as a column with a header (containing the card's title)
 and a footer (containing the series navigation). Each fragment and each note
 is preceded by an HTML anchor, named after its identifier, so any fragment or
-note can be linked to from outside as FILE.html#IDENTIFIER. Each page also refers to the
-RSS feed at deck.url/feed.xml, so set `deck.url` for published decks. Cards
+note can be linked to from outside as FILE.html#IDENTIFIER. If `deck.url` is
+set, each page also refers to the RSS feed at deck.url/feed.xml. Cards
 with mathematics load MathJax 3 (with the amscd package) from the jsDelivr
 CDN.
 
@@ -1106,6 +1106,5 @@ Common errors and known limitations:
 > – Empty matches of regular expressions (of links, notes and styles) are
   ignored: "x*" decorates only non-empty runs of "x".
 
-> – A card in the "timeline" series without the `deck.url` deck attribute fails
-  when the RSS feed is generated. Without `deck.url`, the reference to the
-  feed in every page is "None/feed.xml".
+> – A card in the "timeline" series without the `deck.url` deck attribute:
+  ValueError.

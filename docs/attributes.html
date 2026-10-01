@@ -7,10 +7,6 @@
    <meta charset="UTF-8">
    <title>Attributes</title>
    <link rel="stylesheet" href="style.css">
-   <link rel="alternate"
-         type="application/rss+xml"
-         title="card user manual"
-         href="None/feed.xml">
    <style></style>
    
    
@@ -28,7 +24,7 @@
 <a name="attributes-00007"></a><p style="margin-left: 3em;"><code class="inline">engine</code>: the output engine. Only &quot;html&quot; (the default) is available.</p>
 <a name="attributes-00008"></a><p style="margin-left: 3em;"><code class="inline">deck.title</code>: the title of the deck, used in the RSS feed and in the   reference to the feed from every page.</p>
 <a name="attributes-00009"></a><p style="margin-left: 3em;"><code class="inline">deck.description</code>: the description of the deck, used in the RSS feed.</p>
-<a name="attributes-00010"></a><p style="margin-left: 3em;"><code class="inline">deck.url</code>: the public URL of the output directory. Used to refer to the RSS   feed from every page and in the feed itself. Required if any card is in the   &quot;timeline&quot; series (see <a href="series.html#series-top">Series and tags</a>).</p>
+<a name="attributes-00010"></a><p style="margin-left: 3em;"><code class="inline">deck.url</code>: the public URL of the output directory. If it is set, the RSS   feed is generated, and every page refers to it. Required if any card is in   the &quot;timeline&quot; series (see <a href="series.html#series-top">Series and tags</a>).</p>
 <a name="attributes-00011"></a><p style="margin-left: 3em;"><code class="inline">html.style</code> [list]: CSS appended to the generated style sheet. See HTML   output.</p>
 <a name="attributes-00012"></a><p style="margin-left: 3em;"><code class="inline">html.style.file</code>: the name of the generated style sheet, &quot;style.css&quot; by   default.</p>
 <a name="attributes-00013"></a><p style="margin-left: 3em;"><code class="inline">html.series_compact</code>, <code class="inline">html.series_reverse</code>, <code class="inline">html.series_flat</code>: when set   to a non-empty value, the series links in card footers point to the   compact, reversed or flat variant of the series index.</p>

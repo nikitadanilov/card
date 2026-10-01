@@ -7,10 +7,6 @@
    <meta charset="UTF-8">
    <title>HTML output</title>
    <link rel="stylesheet" href="style.css">
-   <link rel="alternate"
-         type="application/rss+xml"
-         title="card user manual"
-         href="None/feed.xml">
    <style></style>
    
    
@@ -22,8 +18,8 @@
 <a name="html-00002"></a><p style="margin-left: 3em;">– style.css (or the file given by <code class="inline">html.style.file</code>), the style sheet shared   by all files;</p>
 <a name="html-00003"></a><p style="margin-left: 3em;">– a set of index files for each series: series_NAME.html,   series_NAME_compact.html, series_NAME_reverse.html, series_NAME_flat.html and   their combinations;</p>
 <a name="html-00004"></a><p style="margin-left: 3em;">– an index file tags_TAG.html for each tag;</p>
-<a name="html-00005"></a><p style="margin-left: 3em;">– feed.xml, the RSS feed (see <a href="series.html#series-top">Series and tags</a>).</p>
-<a name="html-00006"></a><p>Each card is rendered as a column with a header (containing the card&#x27;s title) and a footer (containing the series navigation). Each fragment and each note is preceded by an HTML anchor, named after its identifier, so any fragment or note can be linked to from outside as FILE.html#IDENTIFIER. Each page also refers to the RSS feed at deck.url/feed.xml, so set <code class="inline">deck.url</code> for published decks. Cards with mathematics load MathJax 3 (with the amscd package) from the jsDelivr CDN.</p>
+<a name="html-00005"></a><p style="margin-left: 3em;">– feed.xml, the RSS feed, if <code class="inline">deck.url</code> is set (see <a href="series.html#series-top">Series and tags</a>).</p>
+<a name="html-00006"></a><p>Each card is rendered as a column with a header (containing the card&#x27;s title) and a footer (containing the series navigation). Each fragment and each note is preceded by an HTML anchor, named after its identifier, so any fragment or note can be linked to from outside as FILE.html#IDENTIFIER. If <code class="inline">deck.url</code> is set, each page also refers to the RSS feed at deck.url/feed.xml. Cards with mathematics load MathJax 3 (with the amscd package) from the jsDelivr CDN.</p>
 <a name="html-00007"></a><p>The output is customised with the following attributes. Remember that <code class="inline">html.style</code>, <code class="inline">html.head</code> and <code class="inline">html.title</code> are lists: always set them with the plus sign.</p>
 <a name="html-00008"></a><p style="margin-left: 3em;"><code class="inline">html.style</code> on the deck: CSS appended to style.css. This is the main means   of changing the look of the output. The style sheet of this manual (fonts,   colours, layout of the header and footer) is defined this way in <a href="https://github.com/nikitadanilov/card/blob/master/self.conf">self.conf</a>:</p>
 <a name="html-00009"></a><pre><code style="margin-left: 6em;">/// +html.style p { text-align: justify; }

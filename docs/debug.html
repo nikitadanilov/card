@@ -7,10 +7,6 @@
    <meta charset="UTF-8">
    <title>Debugging and caveats</title>
    <link rel="stylesheet" href="style.css">
-   <link rel="alternate"
-         type="application/rss+xml"
-         title="card user manual"
-         href="None/feed.xml">
    <style></style>
    
    
@@ -33,6 +29,6 @@
 <a name="debug-00013"></a><p style="margin-left: 3em;">– A link is rendered only at its span ends, so at least one end must be a   span. A link whose source is a whole node (without a regular expression) is   silently ignored. A link from a span to a whole node (a card, a fragment or   a note) is a hyperlink to the anchor of the node.</p>
 <a name="debug-00014"></a><p style="margin-left: 3em;">– Tags and series positions on fragments are not supported: card fails   with a TypeCheckError. Tag cards and put cards in series only.</p>
 <a name="debug-00015"></a><p style="margin-left: 3em;">– Empty matches of regular expressions (of links, notes and styles) are   ignored: &quot;x*&quot; decorates only non-empty runs of &quot;x&quot;.</p>
-<a name="debug-00016"></a><p style="margin-left: 3em;">– A card in the &quot;timeline&quot; series without the <code class="inline">deck.url</code> deck attribute fails   when the RSS feed is generated. Without <code class="inline">deck.url</code>, the reference to the   feed in every page is &quot;None/feed.xml&quot;.</p><footer><a href="phases.html#phases">&lt;</a>&nbsp;<a href="series_trunk.html">trunk</a>&nbsp;&gt;&nbsp;&nbsp;&nbsp;</footer></div>
+<a name="debug-00016"></a><p style="margin-left: 3em;">– A card in the &quot;timeline&quot; series without the <code class="inline">deck.url</code> deck attribute:   ValueError.</p><footer><a href="phases.html#phases">&lt;</a>&nbsp;<a href="series_trunk.html">trunk</a>&nbsp;&gt;&nbsp;&nbsp;&nbsp;</footer></div>
  </body>
 </html>

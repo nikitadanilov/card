@@ -829,16 +829,18 @@ class html_eng(eng):
             '   <meta charset="UTF-8">\n'                     +
             '   <title>{title}</title>\n'                     +
             '   <link rel="stylesheet" href="{stylefile}">\n' +
-            '   <link rel="alternate"\n'                      +
-            '         type="application/rss+xml"\n'           +
-            '         title="{decktitle}"\n'                  +
-            '         href="{url}/feed.xml">\n'               +
+            '{feed}'                                          +
             '   <style>{style}</style>\n'                     +
             '   {head}\n'                                     +
             '   {math}\n'                                     +
             ' </head>\n'                                      +
             ' <body>\n'                                       +
             '   <a name="{anchor}"></a>')
+        self.html_feed_link = (
+            '   <link rel="alternate"\n'                      +
+            '         type="application/rss+xml"\n'           +
+            '         title="{decktitle}"\n'                  +
+            '         href="{url}/feed.xml">\n')
         self.html_card_end = (
             ' </body>\n'                                      +
             '</html>\n')
@@ -998,11 +1000,14 @@ class html_eng(eng):
     def file_begin(self, title : str, style : str, anchor : str, math : str, n : node):
         head_matter = '\n'.join(n.join('html.head'))
         title = html.escape(' '.join(n.join('html.title') + [title]))
+        feed = ''
+        if self.deck.has('deck.url'):
+            feed = self.html_feed_link.format(**{ 'decktitle' : html.escape(self.deck.get('deck.title', str, '')),
+                                                  'url'       : html.escape(self.deck.get('deck.url')) })
         self.out(self.html_card_begin.format(**{ 'title'     : title,
                                                  'stylefile' : self.style_file,
                                                  'style'     : style,
-                                                 'decktitle' : self.deck.get('deck.title'),
-                                                 'url'       : self.deck.get('deck.url'),
+                                                 'feed'      : feed,
                                                  'anchor'    : anchor,
                                                  'head'      : head_matter,
                                                  'math'      : math }))
@@ -1155,6 +1160,10 @@ class html_eng(eng):
             self.out(self.html_card_end)
             self.fd.close()
     def feed(self) -> None:
+        if not self.deck.has('deck.url'):
+            if 'timeline' in self.deck.series:
+                raise ValueError('The "timeline" series requires the deck.url deck attribute.')
+            return
         self.fd = open('feed.xml', 'w')
         self.out(('<?xml version="1.0" encoding="utf-8"?>\n'        +
                   '<rss version="2.0">\n'                           +
@@ -1163,9 +1172,9 @@ class html_eng(eng):
                   '        <link>{url}</link>\n'                    +
                   '        <description>{descr}</description>\n'    +
                   '        <lastBuildDate>{date}</lastBuildDate>\n' +
-                  '\n').format(**{ 'title' : self.deck.get('deck.title'),
-                                   'url'   : self.deck.get('deck.url'),
-                                   'descr' : self.deck.get('deck.description'),
+                  '\n').format(**{ 'title' : html.escape(self.deck.get('deck.title', str, '')),
+                                   'url'   : html.escape(self.deck.get('deck.url')),
+                                   'descr' : html.escape(self.deck.get('deck.description', str, '')),
                                    'date'  : datetime.datetime.now(datetime.timezone.utc).strftime("%a, %d %b %Y %H:%M:%S %z") }))
         for c in self.deck.cards:
             title = html.escape(c.get('card-title', str, 'card'))
@@ -1189,7 +1198,7 @@ class html_eng(eng):
                       '        </item>\n'                                +
                       '\n').format(**{ 'title'   : title,
                                        'id'      : c.id(),
-                                       'url'     : self.deck.get('deck.url') + '/' + c.get(html_file) + '#' + c.get(html_anchor),
+                                       'url'     : html.escape(self.deck.get('deck.url') + '/' + c.get(html_file) + '#' + c.get(html_anchor)),
                                        'date'    : date[0:10],
                                        'content' : html.escape(content) }))
         self.out('</channel></rss>')

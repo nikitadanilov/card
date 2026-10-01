@@ -794,7 +794,6 @@ class TestSeries(CardTest):
     def test_timeline_without_url_fails(self):
         self.fails('/// dir out\n// id a\n// +# timeline 2025-04-01\nx\n', conf = None)
 
-    @unittest.expectedFailure # Known bug.
     def test_no_url(self):
         b = self.build('/// dir out\n// id a\nx\n', conf = None)
         self.assertNotIn('None', b.html('a.html'))
@@ -821,17 +820,14 @@ class TestMath(CardTest):
 # ----------------------------------------------------------------------
 
 class TestOutput(CardTest):
-    @unittest.expectedFailure # Known bug.
     def test_default_dir(self):
         b = self.build('// id c\nx\n', conf = None)
         self.assertTrue(os.path.exists(os.path.join(b.tmp, 'html_out', 'c.html')))
 
-    @unittest.expectedFailure # Known bug.
     def test_current_dir(self):
         b = self.build('/// dir .\n/// deck.url https://example.com\n// id c\nx\n', conf = None)
         self.assertTrue(os.path.exists(os.path.join(b.tmp, 'c.html')))
 
-    @unittest.expectedFailure # Known bug.
     def test_nested_dir(self):
         b = self.build('/// dir a/b\n/// deck.url https://example.com\n// id c\nx\n', conf = None)
         self.assertTrue(os.path.exists(os.path.join(b.tmp, 'a', 'b', 'c.html')))
@@ -885,7 +881,6 @@ class TestCommandLine(CardTest):
         (p, tmp) = self.cli(['a.deck'], { 'a.deck': '// id c\n/ k v\n' })
         self.assertNotEqual(p.returncode, 0)
 
-    @unittest.expectedFailure # Known bug.
     def test_manual(self):
         """The manual builds and its output is valid."""
         tmp = tempfile.mkdtemp(prefix = 'card-test-')
