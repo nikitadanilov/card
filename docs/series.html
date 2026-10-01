@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+ <head>
+   <meta name="viewport"
+         content="width=device-width,
+                  initial-scale=1">
+   <meta charset="UTF-8">
+   <title> Series and tags</title>
+   <link rel="stylesheet" href="style.css">
+   <link rel="alternate"
+         type="application/rss+xml"
+         title="card user manual"
+         href="None/feed.xml">
+   <style></style>
+   
+   
+ </head>
+ <body>
+   <a name="series"></a><div class="column"><header>Series and tags</header>
+<a name="series-top"></a><p>Cards are organised in two ways: by series and by tags.</p>
+<a name="series-00001"></a><p>A series is an ordered sequence of cards. A card is placed in a series by the <code class="inline">#</code> attribute, whose value is the name of the series and the position of the card in it:</p>
+<a name="series-00002"></a><pre><code>// +# trunk 07
+// +# chrono 2025/04/01</code></pre>
+<a name="series-00003"></a><p>A card can be in any number of series, but only once in each. Positions within a series must be unique and are compared as strings, so use zero-padded numbers (&quot;07&quot;, not &quot;7&quot;) or ISO dates. If the position is omitted, the identifier of the card is used.</p>
+<a name="series-00004"></a><p>The footer of each card links it to the previous and the following cards in each series the card belongs to, and to the index of the series. For each series, the HTML engine generates an index file, listing all the cards in the series with their titles, briefs and tags. The brief is cut to its first 80 characters, so keep <code class="inline">brief</code> attributes short. The index comes in several variants (compact or full, in direct or reverse order, as a table or &quot;flat&quot;, that is, with the full text of all cards), and each variant links to the others.</p>
+<a name="series-00005"></a><p>Tags are keywords. A card is tagged with the <code class="inline">tags</code> attribute:</p>
+<a name="series-00006"></a><pre><code>// +tags concepts
+// +tags syntax</code></pre>
+<a name="series-00007"></a><p>For each tag, the HTML engine generates an index file listing the tagged cards.</p>
+<a name="series-00008"></a><p>The series named &quot;timeline&quot; is special: it is used to produce the RSS feed. Each card in this series becomes an item in feed.xml, and the first ten characters of the position are used as the publication date. Use positions like &quot;2025-04-01&quot; or &quot;2025-04-01 12:30&quot; for timeline cards and set the <code class="inline">deck.url</code> deck attribute. Note that the date is written to the feed as is, not in the RFC 822 format required by RSS, so some feed readers may reject the feed.</p><footer><a href="styles.html#styles">&lt;</a>&nbsp;<a href="series_trunk.html">trunk</a>&nbsp;<a href="math.html#math">&gt;</a>&nbsp;&nbsp;&nbsp;<a href="styles.html#styles">&lt;</a>&nbsp;<a href="series_reference.html">reference</a>&nbsp;<a href="html.html#html">&gt;</a>&nbsp;&nbsp;&nbsp;</footer></div>
+ </body>
+</html>

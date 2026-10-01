@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+ <head>
+   <meta name="viewport"
+         content="width=device-width,
+                  initial-scale=1">
+   <meta charset="UTF-8">
+   <title> HTML output</title>
+   <link rel="stylesheet" href="style.css">
+   <link rel="alternate"
+         type="application/rss+xml"
+         title="card user manual"
+         href="None/feed.xml">
+   <style></style>
+   
+   
+ </head>
+ <body>
+   <a name="html"></a><div class="column"><header>HTML output</header>
+<a name="html-top"></a><p>The HTML engine writes its output into the directory given by the <code class="inline">dir</code> deck attribute (&quot;html_out&quot; by default), which is created if needed. The directory contains:</p>
+<a name="html-00001"></a><p style="margin-left: 3em;">– one HTML file for each card, named after the card&#x27;s identifier, unless the   card&#x27;s <code class="inline">html.file</code> attribute specifies another name. If two cards have the   same file name, the later one overwrites the earlier one, so keep the file   names unique;</p>
+<a name="html-00002"></a><p style="margin-left: 3em;">– style.css (or the file given by <code class="inline">html.style.file</code>), the style sheet shared   by all files;</p>
+<a name="html-00003"></a><p style="margin-left: 3em;">– a set of index files for each series: series_NAME.html,   series_NAME_compact.html, series_NAME_reverse.html, series_NAME_flat.html and   their combinations;</p>
+<a name="html-00004"></a><p style="margin-left: 3em;">– an index file tags_TAG.html for each tag;</p>
+<a name="html-00005"></a><p style="margin-left: 3em;">– feed.xml, the RSS feed (see <a href="series.html#series-top">Series and tags</a>).</p>
+<a name="html-00006"></a><p>Each card is rendered as a column with a header (containing the card&#x27;s title) and a footer (containing the series navigation). Each fragment is preceded by an HTML anchor, named after the fragment&#x27;s identifier, so any fragment can be linked to from outside as FILE.html#IDENTIFIER. Each page also refers to the RSS feed at deck.url/feed.xml, so set <code class="inline">deck.url</code> for published decks. Cards with mathematics load MathJax 3 (with the amscd package) from the jsDelivr CDN.</p>
+<a name="html-00007"></a><p>The output is customised with the following attributes. Remember that <code class="inline">html.style</code>, <code class="inline">html.head</code> and <code class="inline">html.title</code> are lists: always set them with the plus sign.</p>
+<a name="html-00008"></a><p style="margin-left: 3em;"><code class="inline">html.style</code> on the deck: CSS appended to style.css. This is the main means   of changing the look of the output. The style sheet of this manual (fonts,   colours, layout of the header and footer) is defined this way in <a href="https://github.com/nikitadanilov/card/blob/master/self.conf">self.conf</a>:</p>
+<a name="html-00009"></a><pre><code style="margin-left: 6em;">/// +html.style p { text-align: justify; }
+/// +html.style a { color: #2288bb; text-decoration:underline; }</code></pre>
+<a name="html-00010"></a><p style="margin-left: 3em;"><code class="inline">html.style</code> on a card: CSS placed in a style element in the card&#x27;s file.</p>
+<a name="html-00011"></a><p style="margin-left: 3em;"><code class="inline">html.style</code> on a fragment: inline CSS for the fragment&#x27;s element:</p>
+<a name="html-00012"></a><pre><code style="margin-left: 6em;">This paragraph is red.
+/ +html.style color: red;</code></pre>
+<a name="html-00013"></a><p style="margin-left: 3em;"><code class="inline">html.head</code>: lines added to the head element of the card&#x27;s file, for   example, to include a script. Inherited.</p>
+<a name="html-00014"></a><p style="margin-left: 3em;"><code class="inline">html.title</code>: a prefix for the title of each HTML file. Inherited.</p>
+<a name="html-00015"></a><p style="margin-left: 3em;"><code class="inline">html.file</code> and <code class="inline">html.anchor</code> on a card, <code class="inline">html.anchor</code> on a fragment:   override the file name and the anchor names.</p>
+<a name="html-00016"></a><p>The style sheet starts with built-in rules, which <code class="inline">html.style</code> can override. The following elements and classes are used by the generated HTML:</p>
+<a name="html-00017"></a><p style="margin-left: 3em;">– <code class="inline">.column</code>: the column containing a card; <code class="inline">header</code> and <code class="inline">footer</code>: its   header and footer;</p>
+<a name="html-00018"></a><p style="margin-left: 3em;">– <code class="inline">code.inline</code>: inline code produced by the <code class="inline">cd</code> style;</p>
+<a name="html-00019"></a><p style="margin-left: 3em;">– <code class="inline">span.annotation</code>: text with a note attached, and the notes themselves;</p>
+<a name="html-00020"></a><p style="margin-left: 3em;">– <code class="inline">span.linktarget</code>: the target span of a link;</p>
+<a name="html-00021"></a><p style="margin-left: 3em;">– <code class="inline">.margin-left</code> and <code class="inline">.margin-right</code>: the left and right margins, holding   link marks, fragment identifiers and notes; <code class="inline">span.frag-id</code>: a fragment   identifier;</p>
+<a name="html-00022"></a><p style="margin-left: 3em;">– <code class="inline">.align-left</code>, <code class="inline">.align-right</code> and <code class="inline">.align-centre</code>: the alignment styles;</p>
+<a name="html-00023"></a><p style="margin-left: 3em;">– <code class="inline">table.no-borders</code>: the tables of the series and tag indices.</p><footer><a href="math.html#math">&lt;</a>&nbsp;<a href="series_trunk.html">trunk</a>&nbsp;<a href="phases.html#phases">&gt;</a>&nbsp;&nbsp;&nbsp;<a href="series.html#series">&lt;</a>&nbsp;<a href="series_reference.html">reference</a>&nbsp;&gt;&nbsp;&nbsp;&nbsp;</footer></div>
+ </body>
+</html>

@@ -1,143 +1,196 @@
-// C card self-documentation deck
+// C card self-documentation deck: the card user manual.
 // name Overview
 // id index
-// +# trunk 0
-This is the documentation for the card tool.
+// brief What card is, the main concepts and the table of contents.
+// +# trunk 00
+// +tags concepts
+/// deck.title card user manual
+/// deck.description The user manual for the card publishing tool.
+This is the user manual for the card tool.
+/ id top
 / += . "card" -> https://github.com/nikitadanilov/card
 
-card is similar to various "publishing" tools that take as the input content
-marked up with various formatting instructions and then render it in various
+card is similar to other "publishing" tools that take as the input content
+marked up with formatting instructions and render it in one or more output
 formats. It is much simpler than hugo or pandoc and its intended scope is more
-of a component in a note-taking system, than a full-blown site publishing engine.
+of a component in a note-taking system than a full-blown site publishing engine.
 / += . "hugo" -> https://gohugo.io/
 / += . "pandoc" -> https://pandoc.org/
 
 The input is a "deck", which is a set of "cards", each consisting of
 "fragments". Fragments correspond to paragraphs and things like code and math
-displays in the output. Cards are used to ogranise content into "series", they
+displays in the output. Cards are used to organise content into "series"; they
 can correspond to pages in the output, but not necessarily.
 
-Decks, cards and fragments all have attributes.
+Decks, cards and fragments all have attributes. Attributes are the only
+mechanism by which formatting is specified: there is no inline markup language
+built into card. Even the conventional _italics_ and *emphasis* in this
+manual are produced by regular expressions defined as attributes of the deck.
 
-The documentation is, naturally, maintained via card here.
-/ += . "here" -> https://github.com/nikitadanilov/card/blob/master/self.deck
-
-Here is the source code for this card, so far (this is not a Quine preceeded by
-its own quotation):
-/ += . "the source code" -> https://github.com/nikitadanilov/card/blob/master/self.deck
-
-; code
-|// C card self-documentation deck
-|// name Overview
-|// id intro
-|// +# trunk 0
-|This is the documentation for the card tool.
-|/ += . "card" -> https://github.com/nikitadanilov/card
-|
-|card is similar to various "publishing" tools that take as the input content
-|marked up with various formatting instructions and then render it in various
-|formats. It is much simpler than hugo or pandoc and its intended scope is more
-|of a component in a note-taking system, than a full-blown site publishing engine.
-|/ += . "hugo" -> https://gohugo.io/
-|/ += . "pandoc" -> https://pandoc.org/
-|
-|The input is a "deck", which is a set of "cards", each consisting of
-|"fragments". Fragments correspond to paragraphs and things like code and math
-|displays in the output. Cards are used to ogranise content into "series", they
-|can correspond to pages in the output, but not necessarily.
-|
-|Decks, cards and fragments all have attributes.
-|
-|The documentation is, naturally, maintained via card here.
-|/ += . "here" -> https://github.com/nikitadanilov/card/blob/master/self.deck
-|
-|Here is the source code for this card, so far (this is not a Quine preceeded by
-|its own quotation):
-|/ += . "the source code" -> https://github.com/nikitadanilov/card/blob/master/self.deck
-
-Note that markup instructions are not embedded in the text. For example, the
-link to Hugo's website is created by
+Markup instructions are not embedded in the text. For example, the link to
+Hugo's website above is created by
 
 ; code
 |/ += . "hugo" -> https://gohugo.io/
 
 This attaches the hyperlink to the part of the preceding paragraph matching the
-regular expression "hugo".
+regular expression "hugo". The separation between the text and the markup
+makes (in my personal opinion, that is) the content source more readable.
 
-The separation between the text and the markup makes (in my personal opinion,
-that is) the content source more readable.
+The documentation is, naturally, maintained via card here. This is how the
+beginning of this card looks in the source (this is not a Quine preceded by its
+own quotation):
+/ += . "here" -> https://github.com/nikitadanilov/card/blob/master/self.deck
+/ += . "the source" -> https://github.com/nikitadanilov/card/blob/master/self.deck
+
+; code
+|// C card self-documentation deck: the card user manual.
+|// name Overview
+|// id index
+|// brief What card is, the main concepts and the table of contents.
+|// +# trunk 00
+|// +tags concepts
+|/// deck.title card user manual
+|/// deck.description The user manual for the card publishing tool.
+|This is the user manual for the card tool.
+|/ id top
+|/ += . "card" -> https://github.com/nikitadanilov/card
+
+The manual consists of the following cards. They form the "trunk" series, so
+you can also read them in order by following the arrows at the bottom of each
+card.
+
+> – Getting started: installation, running card and a first deck.
+/ += . "Getting started" -> !start-top
+
+> – Syntax: the line-oriented format of cardfiles.
+/ += . "Syntax" -> !syntax-top
+
+> – Fragments: paragraphs, code, math, headings and images.
+/ += . "Fragments" -> !fragments-top
+
+> – Attributes: how attributes work, and a reference of attributes understood by card.
+/ += . "Attributes" -> !attributes-top
+
+> – Identifiers: how nodes are named and how to refer to them.
+/ += . "Identifiers" -> !ids-top
+
+> – Links: hyperlinks between the deck and the outside world and within the deck.
+/ += . "Links" -> !links-top
+
+> – Notes: marginal notes attached to a part of the text.
+/ += . "Notes" -> !notes-top
+
+> – Styles: italics, emphasis, code and friends, defined by regular expressions.
+/ += . "Styles" -> !styles-top
+
+> – Series and tags: organising cards: series, navigation, indices and the RSS feed.
+/ += . "Series and tags" -> !series-top
+
+> – Mathematics: inline and display formulae.
+/ += . "Mathematics" -> !math-top
+
+> – HTML output: the files produced and how to customise them.
+/ += . "HTML output" -> !html-top
+
+> – Processing phases: what happens inside card between the input and the output.
+/ += . "Processing phases" -> !phases-top
+
+> – Debugging and caveats: what to do when things go wrong, and known limitations.
+/ += . "Debugging and caveats" -> !debug-top
 
 \
 
-// name Card processing phases
-// id phases
-// +# trunk 1
-// +tags phases
-// +# processing A
-Deck processing happens in the following phases:
+// name Getting started
+// id start
+// brief Installation, running card and a first deck.
+// +# trunk 01
+// +tags concepts
+card is a single Python script. Its only dependency outside of the standard
+library is the typeguard package, which checks type annotations at run-time.
+Its current release needs Python 3.9 or later:
+/ id top
+/ += . "typeguard" -> https://typeguard.readthedocs.io/
 
-> *1*. Syntax. The deck consists of one of more _cardfiles_. Cardfiles are read
- sequentially and parsed. The word "parsed" should not be taken too
- seriously. There is no formal grammar and the "parser" is just a bunch of
- str.split() and str.strip() calls. The main parser's logic is in
- card.cardread() function. (Fun fact: the hyperlinks to the functions in the
- preceding sentences are generated automatically.) A cardfile consists of:
-/ id syntax
+; code
+|$ pip install typeguard
+|$ git clone https://github.com/nikitadanilov/card
+|$ cd card
 
->>       – the formatting instruction indicating the boundaries between fragments and cards,
+card is invoked with a list of cardfiles. All files are read in the order given
+and together form a single deck:
 
->>       – the text of the fragments and
+; code
+|$ ./card [-v] FILE...
 
->>       – the _attributes_ associated with a fragment or a
-           card or a deck. An attribute is a key-value pair, where the key is a string and
-           the value is either a string or a list of strings.
+The only option, `-v` (or `--verbose`), prints the internal representation of the deck after the
+output has been generated (see Debugging and caveats).
+/ += . "Debugging and caveats" -> !debug-top
 
-> The deck, cards and fragments are _nodes_. The parser builds a tree of nodes
- with the deck as the root and with cards and fragments as its children and
- grandchildren respectively.
+Let us write a first deck. Put the following into a file called hello.deck:
 
-> *2*. Cross-referencing. The next phase, implemented in card.crossref()
-   function, interprets attributes to create _layout instructions_ for the
-   text. This happens in multiple steps:
+; code
+|/// dir out
+|// name Hello
+|// id hello
+|Hello, world! This is a _very_ short deck.
+|/ += . "world" -> https://en.wikipedia.org/wiki/Earth
+|
+|; code
+|print("Hello, world!")
 
->>       – First, each element in the tree is assigned a unique identifier that is used
-           to refer to it in the future. The user can specify the identifier by setting
-           the `id` attribute.
+and run
 
->>       – Then, card are orgnised into collection according to _tags_ and _series_. *TDB*.
+; code
+|$ ./card hello.deck
 
->>       – At the next step, styles and links are applied. This is the most involved
-           part of layout creation. Styles and links are specified by regular
-           expressions. The expressions are matched against the next,
-           appropriate layout commands are inserted and the text is split into
-           pieces. card supports general link mechanism: both ends of a link can
-           be specified by an URL, an identifier of a node in the deck, or an
-           identifier together with a regular expression.
+The first line is a deck attribute, telling card to put the output into the
+"out" directory (the default is "html_out"). The next two lines are attributes
+of the (only) card: its title and its identifier. Then comes a paragraph with
+a link attached to the word "world", followed by a code display. The output
+directory now contains hello.html with the rendered card, the style sheet
+style.css and the RSS feed feed.xml (see HTML output).
+/ += . "HTML output" -> !html-top
 
->>       – Once all layout instructions are generated their are assumbled into a program
-           for an abstract layout engine.
+Note that "_very_" was not italicised: conventions such as underscores for
+italics are not built in; they have to be defined as styles (see Styles). The
+usual way to do this is to keep the deck-wide definitions (styles, CSS,
+automatic links) in a separate configuration cardfile that is given to card
+before the content. This manual is built by
+/ += . "Styles" -> !styles-top
 
-> *3*. In the final step, the abstract program is executed by an engine (only
-   HTML engine exists at the moment), which produces the output.
+; code
+|$ ./card self.conf self.deck
 
-> We shall now look at each of the phases in more detail.
+where self.conf contains the style definitions and self.deck contains the text.
+Have a look at both files: they are the most complete example of card usage.
+/ += . "self.conf" -> https://github.com/nikitadanilov/card/blob/master/self.conf
+/ += . "self.deck" -> https://github.com/nikitadanilov/card/blob/master/self.deck
+
+If the deck is going to be published, also set the `deck.url` deck attribute
+to the URL of the output directory. Every page refers to the RSS feed as
+deck.url/feed.xml, and without the attribute this reference is broken.
 
 \
 
-// name Card syntax
+// name Syntax
 // id syntax
-// +# trunk 2
-// +tags phases
-// +# processing B
+// brief The line-oriented format of cardfiles.
+// +# trunk 02
+// +tags syntax
+// +# reference A
 
-The cardfile syntax is extremely simple and line-oriented. The first character
-of a line determines the parser state transition.
+The cardfile syntax is extremely simple and line-oriented. The first word of a
+line (that is, its first sequence of non-blank characters) determines what the
+line means.
+/ id top
 
 > – An empty line marks the end of the previous fragment (if any). Multiple empty
   lines count as one.
 
 > – A line starting with a `;` specifies the type of the immediately following
-  fragment (currently one of `para`, `code` and `math`):
+  fragment (one of `para`, `code`, `math`, `head` or `img`, see Fragments):
+/ += . "Fragments" -> !fragments-top
 
 ; code
 >; code
@@ -164,25 +217,33 @@ of a line determines the parser state transition.
 |This fragment is a text paragraph too.
 
 > – A line starting with a `\` indicates the beginning of a new card. This makes
-  it possible to have multiple cards in one file.
+  it possible to have multiple cards in one file. Each cardfile starts a new
+  card implicitly.
 
 > – A line starting with `///` is a deck attribute. A line starting with a `//` is
   a card attribute and a line starting with `/` is a fragment attribute. All
   attributes have the same syntax: the key and the value separated by spaces. If
-  the key starts with `+`, the value is added to the list of of values for the
-  key (with `+` stripped).
+  the key starts with `+`, the value is added to the list of values for the
+  key (with `+` stripped). See Attributes.
+/ += . "Attributes" -> !attributes-top
 
-> – All other lines are fragment text. If a fragment starts with a number of
-  `>`-s, they are stripped and used to set fragment's indentation level. If a
-  line of a fragment text starts with `|`, that character is stripped. `|` is a
+> – A line starting with `/ +*` creates a note attached to the current
+  fragment and a line starting with `:` is an attribute of the most recently
+  created note. See Notes.
+/ += . "Notes" -> !notes-top
+
+> – All other lines are fragment text. If a line of fragment text starts with
+  `>`-s, they are stripped and used to set the fragment's indentation level. If
+  a line of fragment text starts with `|`, that character is stripped. `|` is a
   _continuation marker_ used to continue the fragment when it would be otherwise
-  terminated (e.g., over blank lines).
+  terminated (e.g., over blank lines). Unlike the other markers, `>` and `|`
+  are recognised only in the very first column of the line.
 
 ; code
 >This is an example of cardfile syntax.
 |The next line sets attribute KEY to the value V0
 |/ KEY V0
-|Setting an attribute does not break the fragment, our paragraph continues.
+|Setting an attribute does not break the fragment; our paragraph continues.
 |Next, make a card attribute LIST with a list of values:
 |// +LIST element0
 |// +LIST element1
@@ -191,91 +252,420 @@ of a line determines the parser state transition.
 ||
 |The indented paragraph continues.
 
-Attributes are used by the cross-referencing phase, described in detail on the
-next card.
+A few consequences of these rules are worth spelling out.
+
+> – Attribute lines can appear anywhere: a card attribute can be set in the
+  middle of a fragment and a deck attribute can be set in any card of any
+  cardfile. A fragment attribute, however, can only be set while a fragment is
+  open: after its first line of text or its `;` line, and before the empty line
+  that ends it.
+
+> – Every attribute must have a value: a line consisting of just `/ key` is an
+  error. Values extend to the end of the line, and can contain spaces.
+
+> – Markers are recognised only as separate words. A text line starting with
+  "/usr/bin" is a text line, because its first word is not `/`.
+
+> – Leading blanks do not protect a line: the line is stripped before its first
+  word is examined. An indented C++ comment "// increment the counter" in a
+  code display is read as a card attribute (setting "increment" to "the
+  counter") and disappears from the output. A comment of a single word, like
+  "// increment", has no value and makes card fail.
+
+> – To start a line of text with a word that would otherwise be interpreted as
+  a marker, prefix the line with `|`. In code displays that contain lines
+  starting with `/`, `//`, `///`, `;`, `:` or `\` (after any blanks), lines
+  starting with `>` or `|` (in the first column) and empty lines, this is
+  required, not optional. The simplest rule is to prefix every line of a code
+  display with `|`: this is how the examples in this manual are written. A
+  literal `|` at the beginning of a line is written as `||`.
+
+> – Leading blanks are preserved in code and math fragments. In paragraphs,
+  lines are joined with a space, but their leading blanks are kept, which
+  matters when writing regular expressions for links and notes (see Links).
+/ += . "Links" -> !links-top
+
+> – There are no comments as such, but attributes not used by card can serve as
+  comments (see Attributes).
+/ += . "Attributes" -> !attributes-attrs
 
 \
 
-// name Card attributes
+// name Fragments
+// id fragments
+// brief Paragraphs, code, math, headings and images.
+// +# trunk 03
+// +tags syntax
+// +# reference B
+A fragment is the unit of content within a card. The type of a fragment is
+given by the `;` line preceding it. The following types are supported.
+/ id top
+
+> `para`: a text paragraph. This is the default type. The lines of a paragraph
+  are joined into one line and the result is subject to styles, links and
+  notes.
+
+> `code`: a display of preformatted text. Lines are kept exactly as written
+  (modulo the leading `|` and `>`-s). Links and notes are applied to code
+  displays, but styles are not.
+
+> `math`: a display formula in TeX notation. See Mathematics.
+/ += . "Mathematics" -> !math-top
+
+> `head`: a heading. The `level` attribute sets the heading level (1 by
+  default):
+
+; code
+>>; head
+|/ level 2
+|Inner workings
+
+> `img`: an image. The image is given by the `url` attribute, and its width by
+  the `width` attribute ("50%" by default). The width is written into the
+  width attribute of the HTML img element, so use a number of pixels or a
+  percentage, not an arbitrary CSS length. The text of the fragment, if any,
+  is rendered right after the image, in the same centred line, so it ends up
+  beside the image if there is room and below it otherwise:
+
+; code
+>>; img
+|/ url https://upload.wikimedia.org/wikipedia/commons/4/47/PNG_transparency_demonstration_1.png
+|/ width 30%
+|Two dice.
+
+Paragraphs, code displays and images can be indented. The number of `>`
+characters at the beginning of a line of text sets the indentation level of
+the whole fragment. Each level is 3em in the HTML output. The indentation of
+headings and display formulae is silently ignored. Indentation is used in this
+manual for lists: card has no special list syntax; a list is just a sequence of indented paragraphs that
+start with a dash. If several lines of a fragment start with `>`, the last one
+wins. Code displays can be indented in the same way: put the `>`-s on the
+first line of the code, as in the examples above.
+
+\
+
+// name Attributes
 // id attributes
-// +# trunk 3
-// +tags phases
+// brief How attributes work, and a reference of attributes understood by card.
+// +# trunk 04
 // +tags attributes
-// +# processing C
+// +# reference C
 
 Attributes are key-value pairs attached to nodes. card uses some of the
-attributes to drive layout creation and then its rendition by the engine. Other
+attributes to drive the layout and its rendering by the engine. Other
 attributes can be used by the user for any purpose:
-/ id attrs
+/ id top
 
 ; code
 |/ C Attribute "C" is not used by card. So it can be used to add comments
-|/ C to the card file. All hail FORTRAN!
+|/ C to the cardfile. All hail FORTRAN!
+/ id attrs
 
+An attribute is either a single value (set with `key value`) or a list of
+values (extended with `+key value`). Setting a single-valued attribute again
+replaces the old value.
 
-The following are the most important attributes used by card:
+*List attributes must always be set with the plus sign*, even when there is
+only one value. card does not complain otherwise, but it treats the string as
+a list of characters: `// tags foo` tags the card with "f" and "o" (twice).
+Conversely, `+key` after a plain `key` fails with a TypeError. In the
+reference below, list attributes are marked [list].
 
-> `tags`: a list of keywords under which the card (or fragment) is indexed:
+Many list attributes are also _inherited_: when card looks up such an
+attribute for a fragment, it combines the values set on the fragment itself,
+on its card and on the deck. This is how styles and automatic links defined
+once in a configuration file apply to every fragment of the deck. Inherited
+attributes are marked [inherited] below. They can be set on the deck, on a
+card or on a fragment.
+
+Deck attributes:
+
+> `dir`: the output directory, relative to the current directory. "html_out" by
+  default. Use "." to write into the current directory.
+
+> `engine`: the output engine. Only "html" (the default) is available.
+
+> `deck.title`: the title of the deck, used in the RSS feed and in the
+  reference to the feed from every page.
+
+> `deck.description`: the description of the deck, used in the RSS feed.
+
+> `deck.url`: the public URL of the output directory. Used to refer to the RSS
+  feed from every page and in the feed itself. Required if any card is in the
+  "timeline" series (see Series and tags).
+/ += . "Series and tags" -> !series-top
+
+> `html.style` [list]: CSS appended to the generated style sheet. See HTML
+  output.
+/ += . "HTML output" -> !html-top
+
+> `html.style.file`: the name of the generated style sheet, "style.css" by
+  default.
+
+> `html.series_compact`, `html.series_reverse`, `html.series_flat`: when set
+  to a non-empty value, the series links in card footers point to the
+  compact, reversed or flat variant of the series index.
+
+Inherited attributes, usually set on the deck:
+
+> `em`, `it`, `bd`, `un`, `cd`, `ma`, `al`, `ar`, `ac` [list, inherited]: style
+  definitions, see Styles.
+/ += . "Styles" -> !styles-top
+
+> `=` [list, inherited]: a link, see Links. Always written as `+=`.
+/ += . "Links" -> !links-top
+
+> `TeX` [list, inherited]: TeX definitions emitted at the top of a card if it
+  contains mathematics, see Mathematics.
+/ += . "Mathematics" -> !math-top
+
+> `html.head` [list, inherited]: lines added to the head element of each HTML
+  file.
+
+> `html.title` [list, inherited]: a prefix for the title of each HTML file.
+
+> `frag.id.show` [list, inherited]: if the first value found is "+", the
+  identifier of each fragment is shown in the left margin. Handy when writing
+  links.
+
+Card attributes:
+
+> `name`: the title of the card, shown in its header, in the HTML title and in
+  the indices.
+
+> `label`: the title of the card if `name` is not set. If neither is set, the
+  title is "Card" followed by the identifier.
+
+> `id`: the identifier of the card (see Identifiers).
+/ += . "Identifiers" -> !ids-top
+
+> `brief`: a short description of the card, shown in the indices. If not set,
+  the beginning of the card's text is used.
+
+> `tags` [list]: keywords under which the card is indexed:
 
 ; code
->>"The way to make people trust-worthy is to trust them."
-|/ +tags Hemingway
-|/ +tags platitudes
+>>"The only way to make a man trustworthy is to trust him."
+|// +tags Stimson
+|// +tags platitudes
 
-> `#`: specifies the position of the card in a series:
+> `#` [list]: the position of the card in a series:
 
 ; code
 >>\
-Card Number Three
-|// +# trunk 3
+|// name Card Number Three
+|// +# trunk 03
 |// +# chrono 2025/04/01
 
->> Attributes above place "Card Three" in the position "3" in "trunk" series and
-  in position "2025/04/01" in "chrono" series. Cards within a series are ordered
-  by their positions lexicographically as strings. The header and the footer of
-  a card links it to the previous and the following cards in each series the
-  card belongs to. For each series HTML engine generates an index file, listing
-  all the cards in the series.
+>> Attributes above place "Card Number Three" at position "03" in the "trunk"
+  series and at position "2025/04/01" in the "chrono" series.
+  See Series and tags.
+/ += . "Series and tags" -> !series-top
 
-> `=`: adds a link. A link attribute value has the following grammar:
+> `html.style` [list]: CSS placed in a style element in the card's file.
+
+> `html.file`: the name of the output file of the card. Derived from the
+  identifier by default.
+
+> `html.anchor`: the HTML anchor of the card. The identifier by default.
+
+Fragment attributes:
+
+> `id`: the identifier of the fragment (see Identifiers).
+
+> `level`: the heading level of a `head` fragment.
+
+> `url`: the source of the image of an `img` fragment.
+
+> `width`: the width of the image of an `img` fragment.
+
+> `html.style` [list]: inline CSS style of the fragment. Ignored for headings
+  and display formulae.
+
+> `html.anchor`: the HTML anchor of the fragment. The identifier by default.
+
+> `>`: the indentation level, set by the parser from the leading `>`-s.
+
+> `+*` is not an attribute, despite the similar syntax: it creates a note, see
+  Notes.
+/ += . "Notes" -> !notes-top
+
+Any node:
+
+> `DEBUG`: the debugging level of the node, see Debugging and caveats. Not
+  inherited.
+/ += . "Debugging and caveats" -> !debug-top
+
+Finally, card sets a few attributes itself: `file`, `seq`, `mtime` and `ctime`
+of a card are the name of the cardfile it came from, its sequential number in
+that file and the modification and change times of the file. `seq` of a
+fragment is its position in the card, and `seq` of a note is its position in
+the fragment. The HTML engine also sets `card-title` on cards and `html.file`
+and `html.anchor` on every card, fragment and note. Treat all these names as
+reserved.
+
+\
+
+// name Identifiers
+// id ids
+// brief How nodes are named and how to refer to them.
+// +# trunk 05
+// +tags attributes
+// +tags links
+Every card, fragment and note has a unique identifier. Identifiers are used to
+refer to nodes in links and to name the output files and anchors.
+/ id top
+
+The identifier of a card is the value of its `id` attribute. If the card has
+no `id`, the identifier is made of the cardfile name and the sequential number
+of the card in the file: the third card of notes.deck is "notes.deck-00002".
+
+The identifier of a fragment is the identifier of its card, a dash and the
+fragment's `id` attribute. If the fragment has no `id` attribute, its
+five-digit sequential number in the card, counting from zero, is used instead.
+For example, the first fragment of this card has `/ id top`, so its identifier
+is "ids-top", while this paragraph is "ids-00002".
+
+The identifier of a note is formed in the same way from the identifier of its
+fragment: FRAGMENT-ID followed by a dash and the note's `id` attribute, or, if
+the note has none, FRAGMENT-ID-note-00000, FRAGMENT-ID-note-00001 and so on.
+Note, however, that no HTML anchor is written for notes, so a link whose
+target is a whole note leads nowhere.
+
+Identifiers must be unique in the deck. Identifiers containing spaces cannot be
+used in links, so do not use them.
+
+Automatically generated identifiers change when cards and fragments are added
+or moved, so any node that is the target of a link should be given an explicit
+`id`. To find the identifier of a fragment, set
 
 ; code
->>LINK           ::= SOURCE '->' TARGET
-SOURCE, TARGET ::= URL | DECK_LOCATION
-DECK_LOCATION  ::= NODE [SPAN]
-NODE           ::= '.' | '!' IDENTIFIER
-SPAN           ::= '"' REGEX '"'
+|/// +frag.id.show +
 
->>`.` refers to the current fragment. `! IDENTIFER` refers to the fragment with
- the given identifier. Examples:
+and the identifiers will be displayed in the left margin of the output.
+
+\
+
+// name Links
+// id links
+// brief Hyperlinks between the deck and the outside world and within the deck.
+// +# trunk 06
+// +tags links
+// +# reference D
+A link connects two _places_: the source and the target. Links are added by
+`+=` attributes. A link attribute value has the following grammar:
+/ id top
 
 ; code
->>\
-|
+>LINK           ::= SOURCE '->' TARGET
+|SOURCE, TARGET ::= URL | DECK_LOCATION
+|DECK_LOCATION  ::= NODE [SPAN]
+|NODE           ::= '.' | '!' IDENTIFIER
+|SPAN           ::= '"' REGEX '"'
+
+`.` refers to the current node: the fragment to which the attribute is
+attached. `! IDENTIFIER` refers to the node with the given identifier (see
+Identifiers). A span is a regular expression (in Python syntax) that selects a
+part of the text of the node. Anything that does not start with `.` or `!` is
+a URL. Examples:
+/ += . "Identifiers" -> !ids-top
+/ += . "Python syntax" -> https://docs.python.org/3/library/re.html
+
+; code
+>\
 |// id CARD0
 |
 |Add a link to a web-page here ...
 |/ id PARA0
 |/ += . "here" -> https://www.example.com
 |
-|Another paragraph. Link _to_ it from a particular text in the previous paragraph. 
-|/ += CARD0-PARA0 "a link" -> . "Link"
+|Another paragraph. Link _to_ it from a particular text in the previous paragraph.
+|/ += !CARD0-PARA0 "a link" -> . "Link"
 
->>When a fragment is the source of a link (i.e., when it is on the left-hand side
- of `->`), HTML engine inserts `A HREF` as needed, like here. If a fragment is the target
- of a link, this is mentioned in a automatically inserted marginalia.
+When a span is the source of a link (i.e., when it is on the left-hand side of
+`->`), the HTML engine turns the matched text into a hyperlink, like here. When a
+span is the target of a link, the matched text is underlined and a numbered
+marginal mark linking back to the source is inserted on the left. If the
+target is a node without a span, the hyperlink leads to the node's anchor.
 / += . "here" -> https://www.example.com
-/ += https://www.example.com -> . "inserted"
+/ += https://www.example.com -> . "is underlined"
 
->`*`: adds a note. HTML renders notes on the right margin. Example:
+The regular expression is matched against the text of the fragment as it is
+written in the cardfile, before styles are applied, so the source markup
+characters (like underscores and asterisks) are visible to it. Every match of
+the expression gets the link, so make the expression specific enough. Use
+lookaheads and lookbehinds to select a word in a particular context, as in the
+"EVCOMB(?=:)" example on the Syntax card. Remember that the lines of a
+paragraph are joined with a space, but leading blanks are preserved: use `\s+`
+rather than a single space to match words that can be split across lines.
+/ += . "Syntax" -> !syntax-top
+
+The URL can refer to the named groups of the expression at the other end with Python
+format syntax. Together with the inheritance of links, this gives _automatic
+links_. A link attribute set on a card applies to every fragment of the card,
+and one set on the deck applies to every fragment of the deck. This manual's
+self.conf contains:
+/ += . "self.conf" -> https://github.com/nikitadanilov/card/blob/master/self.conf
+
+; code
+|/// += . "(?P<type>str|dict|set|list)\.(?P<func>[a-z.A-Z_0-9]+)\(\)" -> https://docs.python.org/3/library/stdtypes.html#{type}.{func}
+|/// += . "\bcard\.(?P<code>[a-z.A-Z_0-9]+)\(\)" -> https://raw.githubusercontent.com/nikitadanilov/card/refs/heads/master/card#:~:text={code}
+
+which is how the mentions of str.split() and card.compile_deck() get their
+hyperlinks. Because the URL of a link with a span at the other end always
+goes through Python formatting, literal braces in such a URL must be doubled:
+write "{{" and "}}" for "{" and "}". Otherwise card fails with a KeyError
+(or IndexError, or ValueError).
+
+The link attribute does not have to be attached to either end of the link. For
+example, the following attribute, attached to some fragment, links a word in
+the fragment with identifier "phases-syntax" to a word in the attached
+fragment:
+
+; code
+|/ += !phases-syntax "sentences" -> . "marginalia"
+
+This works on a fragment, but not on a card or the deck. A link set on a card
+or the deck is created anew for every fragment below it. That is what makes
+automatic links with `.` work, but a link with an explicit "!" end set on a
+card produces as many copies of the same link as the card has fragments. Put
+such links on a fragment.
+
+Note that the source end of a link (the regular expression or the URL) cannot
+contain "->", and identifiers cannot contain spaces.
+
+\
+
+// name Notes
+// id notes
+// brief Marginal notes attached to a part of the text.
+// +# trunk 07
+// +tags links
+// +# reference E
+A note is a short text attached to a part of a fragment. The HTML engine
+renders notes on the right margin and underlines the part of the text they are
+attached to. Each note gets a colour from a cycle of six, so neighbouring notes
+are usually distinguishable. A note is created with
+/ id top
+
+; code
+|/ +* "REGEX" TEXT
+
+where REGEX selects the part of the fragment to which the note is attached
+(the same rules as for the spans in links apply, see Links) and TEXT is the
+text of the note, extending to the end of the line. Note text is subject to
+styles. Lines starting with `:` that immediately follow set attributes of
+the note, for example its identifier. Example:
+/ += . "Links" -> !links-top
 
 ; code
 >>This paragraph talks about one thing and then another thing. A lot of
-  marginalia are inserted here for demonstration purposes.
+|marginalia are inserted here for demonstration purposes.
 |/ +* "one thing" Also described in the next paragraph
-|/ +* "another thing" Which is actually a generalisation of the one thing.
+|: id one
+|/ +* "another thing" Which is actually a _generalisation_ of the one thing.
 |/ += !phases-syntax "sentences" -> . "marginalia"
-|/ += https://www.example.com -> . "result"
+|/ += https://www.example.com -> . "inserted"
 |/ +* "then" Add more colours.
 |/ +* "demonstration" Add even more colours.
 |/ +* "purposes" And more
@@ -283,25 +673,459 @@ SPAN           ::= '"' REGEX '"'
 >>The result looks like this: This paragraph talks about one thing and then
   another thing. A lot of marginalia are inserted here for demonstration
   purposes.
+/ id demo
 / +* "one thing" Also described in the next paragraph
-/ +* "another thing" Which is actually a generalisation of the one thing.
-/ += !phases-syntax "sentences" -> . "marginalia"
-/ += https://www.example.com -> . "result"
+: id one
+/ +* "another thing" Which is actually a _generalisation_ of the one thing.
 / +* "then" Add more colours.
 / +* "demonstration" Add even more colours.
 / +* "purposes" And more
+
+The note's regular expression cannot contain a double quote.
+/ += !phases-syntax "sentences" -> !notes-demo "marginalia"
+/ += https://www.example.com -> !notes-demo "inserted"
+
+If you compare the example with the source of this card, you will see that the
+two link lines are not attached to the result paragraph itself. They are
+attached to the paragraph after it and refer to the result as "!notes-demo"
+instead of ".". This works around a bug in the current version: a fragment's
+link attributes are also applied to each of its notes, so on a fragment with
+notes, links like these come out duplicated and nested.
+
+Notes can contain hyperlinks. A link is added to a note by a `:` line, in the
+same way as a link is added to a fragment by a `/` line. In a note's link
+attribute, `.` refers to the note itself:
+
+; code
+|/ +* "REGEX" TEXT
+|: += . "REGEX" -> TARGET
+
+For example, this sentence has a note with a link.
+/ id linkdemo
+/ +* "a note with a link" See Links for the details.
+: id see
+: += . "Links" -> !links-top
+
+is produced by
+
+; code
+|For example, this sentence has a note with a link.
+|/ id linkdemo
+|/ +* "a note with a link" See Links for the details.
+|: id see
+|: += . "Links" -> !links-top
+
+The `:` lines must immediately follow the note's `/ +*` line (or each other).
+A link attribute can also be attached to any other fragment and refer to the
+note by its identifier, which is how links into notes of other cards are made:
+
+; code
+|/ += !notes-linkdemo-see "Links" -> !links-top
+
+Links defined on the card or on the deck, including automatic links, apply to
+notes as well, and, as described above, so do the link attributes of the note's
+fragment.
+
+A span in a note can only be the source of a link. The target can be a URL, a
+fragment or a span in a fragment. In the latter case, the numbered mark in the
+left margin, which normally links back to the source, leads nowhere, because
+notes have no HTML anchors. A span in a note cannot be the target of a link:
+card fails with an AttributeError.
+
+\
+
+// name Styles
+// id styles
+// brief Italics, emphasis, code and friends, defined by regular expressions.
+// +# trunk 08
+// +tags syntax
+// +# reference F
+card has no built-in inline markup. Instead, _styles_ are defined by
+attributes, whose values are regular expressions. The following styles are
+available:
+/ id top
+
+> `em`: emphasis. `it`: italics. `bd`: bold. `un`: underline. `cd`: inline
+  code. `ma`: inline mathematics (see Mathematics). `al`, `ar`, `ac`: align
+  the text to the left, right or centre.
+/ += . "Mathematics" -> !math-top
+
+The regular expression must contain two named groups: `open` and `close`. The
+text matched by these groups is removed from the output, and the text between
+them is rendered in the style. This manual uses (in self.conf)
+/ += . "self.conf" -> https://github.com/nikitadanilov/card/blob/master/self.conf
+
+; code
+|/// +it (^|[ ])(?P<open>_)[^_]*(?P<close>_)
+|/// +em (^|[ ])(?P<open>\*)[^*]*(?P<close>\*)
+|/// +un (^|[ ])(?P<open>-)[^-]*(?P<close>-)
+|/// +cd (^|[ ])(?P<open>`)[^`]*(?P<close>`)
+
+so that underscores make italics, asterisks make emphasis and so on. The
+groups can be empty, in which case nothing is removed and the matched text is
+simply styled. This is used to italicise Latin abbreviations and to typeset
+anything that looks like a function call as code:
+
+; code
+|/// +cd (^|[ ])(?P<open>)[a-zA-Z0-9_.:]+\(\)(?P<close>)(?=[- .;!?]|$)
+|/// +it (?P<open>)e\.g\.(?P<close>)(?=, )
+
+Styles are inherited, so a style can be defined for the whole deck, for a
+card or for a single fragment. Styles are applied to paragraphs and notes
+only, not to code, math or headings.
+
+Styles are applied in a fixed order: `em`, `it`, `bd`, `un`, `cd`, `ma`, then
+the alignments; within one style, the expressions are tried in the order of
+their definition, the most specific node first. Once a style removes its
+markers, the later styles no longer see them, so if two styles use the same
+characters, only the first one has any effect.
+
+Be careful with the expressions: they are applied to the whole paragraph text.
+With the definitions above, a dash at the beginning of a word starts an
+underlined span that ends at the next dash in the paragraph. This is why this
+manual uses en dashes (–) for its lists.
+
+\
+
+// name Series and tags
+// id series
+// brief Organising cards: series, navigation, indices and the RSS feed.
+// +# trunk 09
+// +tags organisation
+// +# reference G
+Cards are organised in two ways: by series and by tags.
+/ id top
+
+A series is an ordered sequence of cards. A card is placed in a series by the
+`#` attribute, whose value is the name of the series and the position of the
+card in it:
+
+; code
+|// +# trunk 07
+|// +# chrono 2025/04/01
+
+A card can be in any number of series, but only once in each. Positions within
+a series must be unique and are compared as strings, so use zero-padded
+numbers ("07", not "7") or ISO dates. If the position is omitted, the
+identifier of the card is used.
+
+The footer of each card links it to the previous and the following cards in
+each series the card belongs to, and to the index of the series. For each
+series, the HTML engine generates an index file, listing all the cards in the
+series with their titles, briefs and tags. The brief is cut to its first 80
+characters, so keep `brief` attributes short. The index comes in several
+variants (compact or full, in direct or reverse order, as a table or "flat",
+that is, with the full text of all cards), and each variant links to the
+others.
+
+Tags are keywords. A card is tagged with the `tags` attribute:
+
+; code
+|// +tags concepts
+|// +tags syntax
+
+For each tag, the HTML engine generates an index file listing the tagged cards.
+
+The series named "timeline" is special: it is used to produce the RSS feed.
+Each card in this series becomes an item in feed.xml, and the first ten
+characters of the position are used as the publication date. Use positions
+like "2025-04-01" or "2025-04-01 12:30" for timeline cards and set the
+`deck.url` deck attribute. Note that the date is written to the feed as is,
+not in the RFC 822 format required by RSS, so some feed readers may reject the
+feed.
 
 \
 
 /// +TeX \( \def\foo{\operatorname{foo}} \)
 
-// name Math
+// name Mathematics
 // id math
-// +# trunk 4
+// brief Inline and display formulae.
+// +# trunk 10
+// +tags syntax
 // +TeX \( \def\Bag{\operatorname{Bag}} \)
-AAA Example \(x = \foo\) more. More text. more. More text.more. More text.more. More text.more. More text.more. More text.more. More text.more. More text.more. More text.more. More text.more. More text.more. More text.more. More text.more. More text.more. More text.more. More text.more. More text.more. More text. \(  \) Definition.
+card relies on MathJax for mathematics. A card that contains mathematics
+loads MathJax automatically.
+/ id top
+/ += . "MathJax" -> https://www.mathjax.org/
+
+Display formulae are written in `math` fragments, in TeX notation:
+
+; code
+|; math
+|\Bag(x) = e^x = 1 + x + \frac{x^2}{2!} + \frac{x^3}{3!} + \cdots + \frac{x^n}{n!} + \cdots
+
+which gives
 
 ; math
 \Bag(x) = e^x = 1 + x + \frac{x^2}{2!} + \frac{x^3}{3!} + \cdots + \frac{x^n}{n!} + \cdots
 
+Inline formulae, like \(e^{i\pi} + 1 = 0\) or \(\foo(x)\), are written in a
+paragraph using the usual TeX inline delimiters, a backslash followed by an
+opening parenthesis and a backslash followed by a closing parenthesis. For
+card to notice them, there must be an `ma` style matching them (see Styles).
+This manual uses
+/ += . "Styles" -> !styles-top
 
+; code
+|/// +ma \\\((?P<open>)[^\\]*(?P<close>)\\\)
+
+Note that this expression does not allow backslashes inside an inline formula.
+This does not matter as long as the card has some other formula that the
+expression does match: MathJax, once loaded, typesets all formulae in the page.
+
+Styles are applied inside inline formulae as well, and `ma` is applied after
+the other styles. With the manual's definitions, the minus signs in the
+following formula are taken for underline markers and removed:
+
+; code
+|\(a - b - c\)
+
+Avoid characters used as style markers in inline formulae, or put such
+formulae in `math` fragments.
+
+Macros are defined with the `TeX` attribute. Its values are emitted at the top
+of a card containing mathematics. The attribute is inherited, so macros
+needed throughout the deck can be defined as deck attributes, while macros
+specific to a card are defined on the card:
+
+; code
+|/// +TeX \( \def\foo{\operatorname{foo}} \)
+|// +TeX \( \def\Bag{\operatorname{Bag}} \)
+
+\
+
+// name HTML output
+// id html
+// brief The files produced and how to customise them.
+// +# trunk 11
+// +tags html
+// +# reference H
+The HTML engine writes its output into the directory given by the `dir` deck
+attribute ("html_out" by default), which is created if needed. The directory
+contains:
+/ id top
+
+> – one HTML file for each card, named after the card's identifier, unless the
+  card's `html.file` attribute specifies another name. If two cards have the
+  same file name, the later one overwrites the earlier one, so keep the file
+  names unique;
+
+> – style.css (or the file given by `html.style.file`), the style sheet shared
+  by all files;
+
+> – a set of index files for each series: series_NAME.html,
+  series_NAME_compact.html, series_NAME_reverse.html, series_NAME_flat.html and
+  their combinations;
+
+> – an index file tags_TAG.html for each tag;
+
+> – feed.xml, the RSS feed (see Series and tags).
+/ += . "Series and tags" -> !series-top
+
+Each card is rendered as a column with a header (containing the card's title)
+and a footer (containing the series navigation). Each fragment is preceded by
+an HTML anchor, named after the fragment's identifier, so any fragment can be
+linked to from outside as FILE.html#IDENTIFIER. Each page also refers to the
+RSS feed at deck.url/feed.xml, so set `deck.url` for published decks. Cards
+with mathematics load MathJax 3 (with the amscd package) from the jsDelivr
+CDN.
+
+The output is customised with the following attributes. Remember that
+`html.style`, `html.head` and `html.title` are lists: always set them with
+the plus sign.
+
+> `html.style` on the deck: CSS appended to style.css. This is the main means
+  of changing the look of the output. The style sheet of this manual (fonts,
+  colours, layout of the header and footer) is defined this way in self.conf:
+/ += . "self.conf" -> https://github.com/nikitadanilov/card/blob/master/self.conf
+
+; code
+>>/// +html.style p { text-align: justify; }
+|/// +html.style a { color: #2288bb; text-decoration:underline; }
+
+> `html.style` on a card: CSS placed in a style element in the card's file.
+
+> `html.style` on a fragment: inline CSS for the fragment's element:
+
+; code
+>>This paragraph is red.
+|/ +html.style color: red;
+
+> `html.head`: lines added to the head element of the card's file, for
+  example, to include a script. Inherited.
+
+> `html.title`: a prefix for the title of each HTML file. Inherited.
+
+> `html.file` and `html.anchor` on a card, `html.anchor` on a fragment:
+  override the file name and the anchor names.
+
+The style sheet starts with built-in rules, which `html.style` can override.
+The following elements and classes are used by the generated HTML:
+
+> – `.column`: the column containing a card; `header` and `footer`: its
+  header and footer;
+
+> – `code.inline`: inline code produced by the `cd` style;
+
+> – `span.annotation`: text with a note attached, and the notes themselves;
+
+> – `span.linktarget`: the target span of a link;
+
+> – `.margin-left` and `.margin-right`: the left and right margins, holding
+  link marks, fragment identifiers and notes; `span.frag-id`: a fragment
+  identifier;
+
+> – `.align-left`, `.align-right` and `.align-centre`: the alignment styles;
+
+> – `table.no-borders`: the tables of the series and tag indices.
+
+\
+
+// name Processing phases
+// id phases
+// brief What happens inside card between the input and the output.
+// +# trunk 12
+// +tags internals
+This card describes how card works inside. You do not need it to write decks,
+but it helps to understand the error messages and the caveats on the next
+card.
+/ id top
+
+Deck processing happens in the following phases:
+
+> *1*. Syntax. The deck consists of one or more _cardfiles_. Cardfiles are read
+ sequentially and parsed. The word "parsed" should not be taken too
+ seriously. There is no formal grammar and the "parser" is just a bunch of
+ str.split() and str.strip() calls. The main parser's logic is in
+ the card.read_card_file() function. (Fun fact: the hyperlinks to the functions in the
+ preceding sentences are generated automatically.) A cardfile consists of:
+/ id syntax
+
+>>       – the formatting instructions indicating the boundaries between fragments and cards,
+
+>>       – the text of the fragments and
+
+>>       – the _attributes_ associated with a fragment or a
+           card or a deck. An attribute is a key-value pair, where the key is a string and
+           the value is either a string or a list of strings.
+
+> The deck, cards, fragments and notes are _nodes_. The parser builds a tree of
+ nodes with the deck as the root, cards as its children, fragments as its
+ grandchildren and notes attached to fragments at the bottom.
+
+> *2*. Compilation. The next phase, implemented in the card.compile_deck() function,
+   interprets attributes to create _layout instructions_ for the text. This
+   happens in multiple passes:
+
+>>       – First, each node in the tree is assigned a unique identifier that is used
+           to refer to it in the future. The user can specify the identifier by setting
+           the `id` attribute. At the same time cards are collected according to
+           their _tags_ and _series_.
+
+>>       – Then, links are instantiated from the link attributes. card supports
+           a general link mechanism: both ends of a link can be specified by a
+           URL, an identifier of a node in the deck, or an identifier together
+           with a regular expression.
+
+>>       – At the next step, styles are attached to the nodes. Styles and links
+           are specified by regular expressions.
+
+>>       – Next, each fragment is _lowered_: the regular expressions of its links,
+           notes and styles are matched against the text, appropriate layout
+           commands are inserted and the text is split into pieces.
+
+>>       – Finally, cards and the deck are wrapped in begin and end commands and
+           the commands of all nodes are assembled into a program for an
+           abstract layout engine.
+
+> *3*. Rendering. In the final step, implemented in card.render_deck(), the
+   abstract program is executed by an engine (only the HTML engine exists at the
+   moment), which produces the output.
+
+\
+
+// name Debugging and caveats
+// id debug
+// brief What to do when things go wrong, and known limitations.
+// +# trunk 13
+// +tags internals
+card does very little error checking. Most errors in a cardfile result in a
+Python assertion failure or exception, with a stack trace that points to the
+place in card where the problem was detected, rather than to the line of the
+cardfile. The following tools help to find the problem.
+/ id top
+
+> – `-v` prints the internal representation of the deck: all nodes with their
+  attributes, layout commands and text. It is printed after the output has
+  been generated, so it shows nothing if card fails.
+
+> – The `DEBUG` attribute enables debugging output for the node on which it is
+  set: level 2 traces matching of the regular expressions, level 3 traces it
+  in more detail, level 4 traces setting of attributes. For example, to debug
+  the styles of a single paragraph, add `/ DEBUG 3` to it. `DEBUG` is not
+  inherited: setting it on the deck does not trace the fragments. Level 4
+  reports only the attributes set after the `DEBUG` line itself.
+
+> – `frag.id.show` shows the fragment identifiers (see Identifiers).
+/ += . "Identifiers" -> !ids-top
+
+Common errors and known limitations:
+
+> – A fragment attribute while no fragment is open: assertion failure in the
+  parser. This usually happens when a `/` line follows an empty line, which
+  has already closed the fragment, and also at the start of a card. A `:`
+  line not preceded by a note fails the same way.
+
+> – An attribute line without a value, including a code line like "// note"
+  that was not protected by `|`: IndexError in the parser.
+
+> – A `;` line without a fragment type: IndexError. An unknown fragment type:
+  KeyError.
+
+> – A list attribute set without `+`: no error, but the value is split into
+  characters. A `+key` after a plain `key`: TypeError. See Attributes.
+/ += . "Attributes" -> !attributes-top
+
+> – Duplicate identifiers, or duplicate positions within a series: assertion
+  failure.
+
+> – Unexpected empty cards. A cardfile without explicit `\` lines still forms
+  a card, so a configuration file containing only deck attributes produces an
+  empty card (and an HTML file) of its own. Similarly, a `\` line at the very
+  beginning or the very end of a cardfile creates an extra empty card.
+
+> – A card without an `id` in a cardfile given with a directory part (for
+  example, "../notes/a.deck"): the identifier, and hence the output file name,
+  includes the directory, and card fails to create the file. Give such cards
+  explicit identifiers, or run card from the directory of the cardfiles.
+
+> – A link to a non-existent identifier: KeyError. A URL containing braces in
+  a link with a span at the other end: KeyError, IndexError or ValueError
+  (see Links).
+/ += . "Links" -> !links-top
+
+> – A link is rendered only at its span ends, so at least one end must be a
+  span. A link whose source is a whole node (without a regular expression) is
+  silently ignored. A link from a span to a whole fragment works, but a link whose target is a whole
+  card fails, so link to the first fragment of the card instead, as this
+  manual does. There are no HTML anchors for notes, so links to whole notes lead
+  nowhere, and so do the back-links of links whose source is a span in a note.
+  A link whose target is a span in a note fails with an AttributeError (see
+  Notes).
+/ += . "Notes" -> !notes-top
+
+> – A fragment's link attributes are also applied to its notes, which
+  duplicates links on fragments with notes (see Notes).
+/ += . "Notes" -> !notes-top
+
+> – Tags and series positions on fragments are not supported: card fails
+  with a TypeCheckError. Tag cards and put cards in series only.
+
+> – A regular expression (of a link, a note or a style) that can match the
+  empty string, such as "x*", makes card loop forever. Make sure every
+  expression matches at least one character.
+
+> – A card in the "timeline" series without the `deck.url` deck attribute fails
+  when the RSS feed is generated. Without `deck.url`, the reference to the
+  feed in every page is "None/feed.xml".

@@ -1,18 +1,26 @@
 <!DOCTYPE html>
 <html>
  <head>
+   <meta name="viewport"
+         content="width=device-width,
+                  initial-scale=1">
    <meta charset="UTF-8">
-   <title>Card syntax</title>
+   <title> Syntax</title>
    <link rel="stylesheet" href="style.css">
+   <link rel="alternate"
+         type="application/rss+xml"
+         title="card user manual"
+         href="None/feed.xml">
    <style></style>
+   
    
  </head>
  <body>
-   <a name="syntax"></a><div class="column"><header>Card syntax</header>
-<a name="syntax-00000"></a><p>The cardfile syntax is extremely simple and line-oriented. The first character of a line determines the parser state transition.</p>
-<a name="syntax-00001"></a><p>– An empty line marks the end of the previous fragment (if any). Multiple empty   lines count as one.</p>
-<a name="syntax-00002"></a><p>– A line starting with a <code class="inline">;</code> specifies the type of the immediately following   fragment (currently one of <code class="inline">para</code>, <code class="inline">code</code> and <code class="inline">math</code>):</p>
-<a name="syntax-00003"></a><pre><code>; code
+   <a name="syntax"></a><div class="column"><header>Syntax</header>
+<a name="syntax-top"></a><p>The cardfile syntax is extremely simple and line-oriented. The first word of a line (that is, its first sequence of non-blank characters) determines what the line means.</p>
+<a name="syntax-00001"></a><p style="margin-left: 3em;">– An empty line marks the end of the previous fragment (if any). Multiple empty   lines count as one.</p>
+<a name="syntax-00002"></a><p style="margin-left: 3em;">– A line starting with a <code class="inline">;</code> specifies the type of the immediately following   fragment (one of <code class="inline">para</code>, <code class="inline">code</code>, <code class="inline">math</code>, <code class="inline">head</code> or <code class="inline">img</code>, see <a href="fragments.html#fragments-top">Fragments</a>):</p>
+<a name="syntax-00003"></a><pre><code style="margin-left: 3em;">; code
 EVCOMB: ARGS := &#x27;()
 EVCOM1: TYPE-DISPATCH ON EXP INTO
                 &quot;COMBINATION&quot;: GOTO EVCOM2
@@ -26,18 +34,19 @@ EVCOM1: TYPE-DISPATCH ON EXP INTO
 ; para
 The previous fragment was a block display of code with an embedded link. This
 fragment is a text paragraph.</code></pre>
-<a name="syntax-00004"></a><p>If the fragment type is not specified, the next fragment will be a paragraph.</p>
-<a name="syntax-00005"></a><pre><code>; para
+<a name="syntax-00004"></a><p style="margin-left: 3em;">If the fragment type is not specified, the next fragment will be a paragraph.</p>
+<a name="syntax-00005"></a><pre><code style="margin-left: 3em;">; para
 This fragment is a text paragraph.
 
 This fragment is a text paragraph too.</code></pre>
-<a name="syntax-00006"></a><p>– A line starting with a <code class="inline">\</code> indicates the beginning of a new card. This makes   it possible to have multiple cards in one file.</p>
-<a name="syntax-00007"></a><p>– A line starting with <code class="inline">///</code> is a deck attribute. A line starting with a <code class="inline">//</code> is   a card attribute and a line starting with <code class="inline">/</code> is a fragment attribute. All   attributes have the same syntax: the key and the value separated by spaces. If   the key starts with <code class="inline">+</code>, the value is added to the list of of values for the   key (with <code class="inline">+</code> stripped).</p>
-<a name="syntax-00008"></a><p>– All other lines are fragment text. If a fragment starts with a number of   <code class="inline">&gt;</code>-s, they are stripped and used to set fragment&#x27;s indentation level. If a   line of a fragment text starts with <code class="inline">|</code>, that character is stripped. <code class="inline">|</code> is a   <i>continuation marker</i> used to continue the fragment when it would be otherwise   terminated (<i>e.g.</i>, over blank lines).</p>
-<a name="syntax-00009"></a><pre><code>This is an example of cardfile syntax.
+<a name="syntax-00006"></a><p style="margin-left: 3em;">– A line starting with a <code class="inline">\</code> indicates the beginning of a new card. This makes   it possible to have multiple cards in one file. Each cardfile starts a new   card implicitly.</p>
+<a name="syntax-00007"></a><p style="margin-left: 3em;">– A line starting with <code class="inline">///</code> is a deck attribute. A line starting with a <code class="inline">//</code> is   a card attribute and a line starting with <code class="inline">/</code> is a fragment attribute. All   attributes have the same syntax: the key and the value separated by spaces. If   the key starts with <code class="inline">+</code>, the value is added to the list of values for the   key (with <code class="inline">+</code> stripped). See <a href="attributes.html#attributes-top">Attributes</a>.</p>
+<a name="syntax-00008"></a><p style="margin-left: 3em;">– A line starting with <code class="inline">/ +*</code> creates a note attached to the current   fragment and a line starting with <code class="inline">:</code> is an attribute of the most recently   created note. See <a href="notes.html#notes-top">Notes</a>.</p>
+<a name="syntax-00009"></a><p style="margin-left: 3em;">– All other lines are fragment text. If a line of fragment text starts with   <code class="inline">&gt;</code>-s, they are stripped and used to set the fragment&#x27;s indentation level. If   a line of fragment text starts with <code class="inline">|</code>, that character is stripped. <code class="inline">|</code> is a   <i>continuation marker</i> used to continue the fragment when it would be otherwise   terminated (<i>e.g.</i>, over blank lines). Unlike the other markers, <code class="inline">&gt;</code> and <code class="inline">|</code>   are recognised only in the very first column of the line.</p>
+<a name="syntax-00010"></a><pre><code style="margin-left: 3em;">This is an example of cardfile syntax.
 The next line sets attribute KEY to the value V0
 / KEY V0
-Setting an attribute does not break the fragment, our paragraph continues.
+Setting an attribute does not break the fragment; our paragraph continues.
 Next, make a card attribute LIST with a list of values:
 // +LIST element0
 // +LIST element1
@@ -45,6 +54,13 @@ Next, make a card attribute LIST with a list of values:
 &gt; This paragraph is indented.
 |
 The indented paragraph continues.</code></pre>
-<a name="syntax-00010"></a><p>Attributes are used by the cross-referencing phase, described in detail on the next card.</p><footer><a href="phases.html#phases">&lt;</a>&nbsp;<a href="series_trunk.html">trunk</a>&nbsp;<a href="attributes.html#attributes">&gt;</a>&nbsp;&nbsp;&nbsp;<a href="phases.html#phases">&lt;</a>&nbsp;<a href="series_processing.html">processing</a>&nbsp;<a href="attributes.html#attributes">&gt;</a>&nbsp;&nbsp;&nbsp;</footer></div>
+<a name="syntax-00011"></a><p>A few consequences of these rules are worth spelling out.</p>
+<a name="syntax-00012"></a><p style="margin-left: 3em;">– Attribute lines can appear anywhere: a card attribute can be set in the   middle of a fragment and a deck attribute can be set in any card of any   cardfile. A fragment attribute, however, can only be set while a fragment is   open: after its first line of text or its <code class="inline">;</code> line, and before the empty line   that ends it.</p>
+<a name="syntax-00013"></a><p style="margin-left: 3em;">– Every attribute must have a value: a line consisting of just <code class="inline">/ key</code> is an   error. Values extend to the end of the line, and can contain spaces.</p>
+<a name="syntax-00014"></a><p style="margin-left: 3em;">– Markers are recognised only as separate words. A text line starting with   &quot;/usr/bin&quot; is a text line, because its first word is not <code class="inline">/</code>.</p>
+<a name="syntax-00015"></a><p style="margin-left: 3em;">– Leading blanks do not protect a line: the line is stripped before its first   word is examined. An indented C++ comment &quot;// increment the counter&quot; in a   code display is read as a card attribute (setting &quot;increment&quot; to &quot;the   counter&quot;) and disappears from the output. A comment of a single word, like   &quot;// increment&quot;, has no value and makes card fail.</p>
+<a name="syntax-00016"></a><p style="margin-left: 3em;">– To start a line of text with a word that would otherwise be interpreted as   a marker, prefix the line with <code class="inline">|</code>. In code displays that contain lines   starting with <code class="inline">/</code>, <code class="inline">//</code>, <code class="inline">///</code>, <code class="inline">;</code>, <code class="inline">:</code> or <code class="inline">\</code> (after any blanks), lines   starting with <code class="inline">&gt;</code> or <code class="inline">|</code> (in the first column) and empty lines, this is   required, not optional. The simplest rule is to prefix every line of a code   display with <code class="inline">|</code>: this is how the examples in this manual are written. A   literal <code class="inline">|</code> at the beginning of a line is written as <code class="inline">||</code>.</p>
+<a name="syntax-00017"></a><p style="margin-left: 3em;">– Leading blanks are preserved in code and math fragments. In paragraphs,   lines are joined with a space, but their leading blanks are kept, which   matters when writing regular expressions for links and notes (see <a href="links.html#links-top">Links</a>).</p>
+<a name="syntax-00018"></a><p style="margin-left: 3em;">– There are no comments as such, but attributes not used by card can serve as   comments (see <a href="attributes.html#attributes-attrs">Attributes</a>).</p><footer><a href="start.html#start">&lt;</a>&nbsp;<a href="series_trunk.html">trunk</a>&nbsp;<a href="fragments.html#fragments">&gt;</a>&nbsp;&nbsp;&nbsp;&lt;&nbsp;<a href="series_reference.html">reference</a>&nbsp;<a href="fragments.html#fragments">&gt;</a>&nbsp;&nbsp;&nbsp;</footer></div>
  </body>
 </html>

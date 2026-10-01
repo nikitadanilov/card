@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html>
+ <head>
+   <meta name="viewport"
+         content="width=device-width,
+                  initial-scale=1">
+   <meta charset="UTF-8">
+   <title> Series trunk</title>
+   <link rel="stylesheet" href="style.css">
+   <link rel="alternate"
+         type="application/rss+xml"
+         title="card user manual"
+         href="None/feed.xml">
+   <style></style>
+   
+   
+        <script>window.MathJax = {
+                loader: {load     : ['[tex]/amscd']},
+                tex:    {packages : {'[+]': ['amscd']}}
+        };
+        </script>
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+ </head>
+ <body>
+   <a name=""></a><table class="no-borders"><tr><td><a href="series_trunk_flat.html">reverse</a></td><td><a href="series_trunk_compact_reverse_flat.html">compact</a></td><td><a href="series_trunk_reverse.html">indexed</a></td></tr></table><table class="no-borders"><div class="column"><header>Debugging and caveats</header>
+<a name="debug-top"></a><p>card does very little error checking. Most errors in a cardfile result in a Python assertion failure or exception, with a stack trace that points to the place in card where the problem was detected, rather than to the line of the cardfile. The following tools help to find the problem.</p>
+<a name="debug-00001"></a><p style="margin-left: 3em;">– <code class="inline">-v</code> prints the internal representation of the deck: all nodes with their   attributes, layout commands and text. It is printed after the output has   been generated, so it shows nothing if card fails.</p>
+<a name="debug-00002"></a><p style="margin-left: 3em;">– The <code class="inline">DEBUG</code> attribute enables debugging output for the node on which it is   set: level 2 traces matching of the regular expressions, level 3 traces it   in more detail, level 4 traces setting of attributes. For example, to debug   the styles of a single paragraph, add <code class="inline">/ DEBUG 3</code> to it. <code class="inline">DEBUG</code> is not   inherited: setting it on the deck does not trace the fragments. Level 4   reports only the attributes set after the <code class="inline">DEBUG</code> line itself.</p>
+<a name="debug-00003"></a><p style="margin-left: 3em;">– <code class="inline">frag.id.show</code> shows the fragment identifiers (see <a href="ids.html#ids-top">Identifiers</a>).</p>
+<a name="debug-00004"></a><p>Common errors and known limitations:</p>
+<a name="debug-00005"></a><p style="margin-left: 3em;">– A fragment attribute while no fragment is open: assertion failure in the   parser. This usually happens when a <code class="inline">/</code> line follows an empty line, which   has already closed the fragment, and also at the start of a card. A <code class="inline">:</code>   line not preceded by a note fails the same way.</p>
+<a name="debug-00006"></a><p style="margin-left: 3em;">– An attribute line without a value, including a code line like &quot;// note&quot;   that was not protected by <code class="inline">|</code>: IndexError in the parser.</p>
+<a name="debug-00007"></a><p style="margin-left: 3em;">– A <code class="inline">;</code> line without a fragment type: IndexError. An unknown fragment type:   KeyError.</p>
+<a name="debug-00008"></a><p style="margin-left: 3em;">– A list attribute set without <code class="inline">+</code>: no error, but the value is split into   characters. A <code class="inline">+key</code> after a plain <code class="inline">key</code>: TypeError. See <a href="attributes.html#attributes-top">Attributes</a>.</p>
+<a name="debug-00009"></a><p style="margin-left: 3em;">– Duplicate identifiers, or duplicate positions within a series: assertion   failure.</p>
+<a name="debug-00010"></a><p style="margin-left: 3em;">– Unexpected empty cards. A cardfile without explicit <code class="inline">\</code> lines still forms   a card, so a configuration file containing only deck attributes produces an   empty card (and an HTML file) of its own. Similarly, a <code class="inline">\</code> line at the very   beginning or the very end of a cardfile creates an extra empty card.</p>
+<a name="debug-00011"></a><p style="margin-left: 3em;">– A card without an <code class="inline">id</code> in a cardfile given with a directory part (for   example, &quot;../notes/a.deck&quot;): the identifier, and hence the output file name,   includes the directory, and card fails to create the file. Give such cards   explicit identifiers, or run card from the directory of the cardfiles.</p>
+<a name="debug-00012"></a><p style="margin-left: 3em;">– A link to a non-existent identifier: KeyError. A URL containing braces in   a link with a span at the other end: KeyError, IndexError or ValueError   (see <a href="links.html#links-top">Links</a>).</p>
+<a name="debug-00013"></a><p style="margin-left: 3em;">– A link is rendered only at its span ends, so at least one end must be a   span. A link whose source is a whole node (without a regular expression) is   silently ignored. A link from a span to a whole fragment works, but a link whose target is a whole   card fails, so link to the first fragment of the card instead, as this   manual does. There are no HTML anchors for notes, so links to whole notes lead   nowhere, and so do the back-links of links whose source is a span in a note.   A link whose target is a span in a note fails with an AttributeError (see   <a href="notes.html#notes-top">Notes</a>).</p>
+<a name="debug-00014"></a><p style="margin-left: 3em;">– A fragment&#x27;s link attributes are also applied to its notes, which   duplicates links on fragments with notes (see <a href="notes.html#notes-top">Notes</a>).</p>
+<a name="debug-00015"></a><p style="margin-left: 3em;">– Tags and series positions on fragments are not supported: card fails   with a TypeCheckError. Tag cards and put cards in series only.</p>
+<a name="debug-00016"></a><p style="margin-left: 3em;">– A regular expression (of a link, a note or a style) that can match the   empty string, such as &quot;x*&quot;, makes card loop forever. Make sure every   expression matches at least one character.</p>
+<a name="debug-00017"></a><p style="margin-left: 3em;">– A card in the &quot;timeline&quot; series without the <code class="inline">deck.url</code> deck attribute fails   when the RSS feed is generated. Without <code class="inline">deck.url</code>, the reference to the   feed in every page is &quot;None/feed.xml&quot;.</p><footer><a href="phases.html#phases">&lt;</a>&nbsp;<a href="series_trunk.html">trunk</a>&nbsp;&gt;&nbsp;&nbsp;&nbsp;</footer></div><p>&nbsp;</p><div class="column"><header>Processing phases</header>
+<a name="phases-top"></a><p>This card describes how card works inside. You do not need it to write decks, but it helps to understand the error messages and the caveats on the next card.</p>
+<a name="phases-00001"></a><p>Deck processing happens in the following phases:</p>
+<a name="phases-syntax"></a><p style="margin-left: 3em;"><em>1</em>. Syntax. The deck consists of one or more <i>cardfiles</i>. Cardfiles are read  sequentially and parsed. The word &quot;parsed&quot; should not be taken too  seriously. There is no formal grammar and the &quot;parser&quot; is just a bunch of  <a href="https://docs.python.org/3/library/stdtypes.html#str.split"><code class="inline">str.split()</code></a> and <a href="https://docs.python.org/3/library/stdtypes.html#str.strip"><code class="inline">str.strip()</code></a> calls. The main parser&#x27;s logic is in  the <a href="https://raw.githubusercontent.com/nikitadanilov/card/refs/heads/master/card#:~:text=read_card_file"><code class="inline">card.read_card_file()</code></a> function. (Fun fact: the hyperlinks to the functions in the  preceding <a href="notes.html#notes-demo">sentences</a> are generated automatically.) A cardfile consists of:</p>
+<a name="phases-00003"></a><p style="margin-left: 6em;">– the formatting instructions indicating the boundaries between fragments and cards,</p>
+<a name="phases-00004"></a><p style="margin-left: 6em;">– the text of the fragments and</p>
+<a name="phases-00005"></a><p style="margin-left: 6em;">– the <i>attributes</i> associated with a fragment or a            card or a deck. An attribute is a key-value pair, where the key is a string and            the value is either a string or a list of strings.</p>
+<a name="phases-00006"></a><p style="margin-left: 3em;">The deck, cards, fragments and notes are <i>nodes</i>. The parser builds a tree of  nodes with the deck as the root, cards as its children, fragments as its  grandchildren and notes attached to fragments at the bottom.</p>
+<a name="phases-00007"></a><p style="margin-left: 3em;"><em>2</em>. Compilation. The next phase, implemented in the <a href="https://raw.githubusercontent.com/nikitadanilov/card/refs/heads/master/card#:~:text=compile_deck"><code class="inline">card.compile_deck()</code></a> function,    interprets attributes to create <i>layout instructions</i> for the text. This    happens in multiple passes:</p>
+<a name="phases-00008"></a><p style="margin-left: 6em;">– First, each node in the tree is assigned a unique identifier that is used            to refer to it in the future. The user can specify the identifier by setting            the <code class="inline">id</code> attribute. At the same time cards are collected according to            their <i>tags</i> and <i>series</i>.</p>
+<a name="phases-00009"></a><p style="margin-left: 6em;">– Then, links are instantiated from the link attributes. card supports            a general link mechanism: both ends of a link can be specified by a            URL, an identifier of a node in the deck, or an identifier together            with a regular expression.</p>
+<a name="phases-00010"></a><p style="margin-left: 6em;">– At the next step, styles are attached to the nodes. Styles and links            are specified by regular expressions.</p>
+<a name="phases-00011"></a><p style="margin-left: 6em;">– Next, each fragment is <i>lowered</i>: the regular expressions of its links,            notes and styles are matched against the text, appropriate layout            commands are inserted and the text is split into pieces.</p>
+<a name="phases-00012"></a><p style="margin-left: 6em;">– Finally, cards and the deck are wrapped in begin and end commands and            the commands of all nodes are assembled into a program for an            abstract layout engine.</p>
+<a name="phases-00013"></a><p style="margin-left: 3em;"><em>3</em>. Rendering. In the final step, implemented in <a href="https://raw.githubusercontent.com/nikitadanilov/card/refs/heads/master/card#:~:text=render_deck">card.render_deck()</a>, the    abstract program is executed by an engine (only the HTML engine exists at the    moment), which produces the output.</p><footer><a href="html.html#html">&lt;</a>&nbsp;<a href="series_trunk.html">trunk</a>&nbsp;<a href="debug.html#debug">&gt;</a>&nbsp;&nbsp;&nbsp;</footer></div><p>&nbsp;</p><div class="column"><header>HTML output</header>
+<a name="html-top"></a><p>The HTML engine writes its output into the directory given by the <code class="inline">dir</code> deck attribute (&quot;html_out&quot; by default), which is created if needed. The directory contains:</p>
+<a name="html-00001"></a><p style="margin-left: 3em;">– one HTML file for each card, named after the card&#x27;s identifier, unless the   card&#x27;s <code class="inline">html.file</code> attribute specifies another name. If two cards have the   same file name, the later one overwrites the earlier one, so keep the file   names unique;</p>
+<a name="html-00002"></a><p style="margin-left: 3em;">– style.css (or the file given by <code class="inline">html.style.file</code>), the style sheet shared   by all files;</p>
+<a name="html-00003"></a><p style="margin-left: 3em;">– a set of index files for each series: series_NAME.html,   series_NAME_compact.html, series_NAME_reverse.html, series_NAME_flat.html and   their combinations;</p>
+<a name="html-00004"></a><p style="margin-left: 3em;">– an index file tags_TAG.html for each tag;</p>
+<a name="html-00005"></a><p style="margin-left: 3em;">– feed.xml, the RSS feed (see <a href="series.html#series-top">Series and tags</a>).</p>
+<a name="html-00006"></a><p>Each card is rendered as a column with a header (containing the card&#x27;s title) and a footer (containing the series navigation). Each fragment is preceded by an HTML anchor, named after the fragment&#x27;s identifier, so any fragment can be linked to from outside as FILE.html#IDENTIFIER. Each page also refers to the RSS feed at deck.url/feed.xml, so set <code class="inline">deck.url</code> for published decks. Cards with mathematics load MathJax 3 (with the amscd package) from the jsDelivr CDN.</p>
+<a name="html-00007"></a><p>The output is customised with the following attributes. Remember that <code class="inline">html.style</code>, <code class="inline">html.head</code> and <code class="inline">html.title</code> are lists: always set them with the plus sign.</p>
+<a name="html-00008"></a><p style="margin-left: 3em;"><code class="inline">html.style</code> on the deck: CSS appended to style.css. This is the main means   of changing the look of the output. The style sheet of this manual (fonts,   colours, layout of the header and footer) is defined this way in <a href="https://github.com/nikitadanilov/card/blob/master/self.conf">self.conf</a>:</p>
+<a name="html-00009"></a><pre><code style="margin-left: 6em;">/// +html.style p { text-align: justify; }
+/// +html.style a { color: #2288bb; text-decoration:underline; }</code></pre>
+<a name="html-00010"></a><p style="margin-left: 3em;"><code class="inline">html.style</code> on a card: CSS placed in a style element in the card&#x27;s file.</p>
+<a name="html-00011"></a><p style="margin-left: 3em;"><code class="inline">html.style</code> on a fragment: inline CSS for the fragment&#x27;s element:</p>
+<a name="html-00012"></a><pre><code style="margin-left: 6em;">This paragraph is red.
+/ +html.style color: red;</code></pre>
+<a name="html-00013"></a><p style="margin-left: 3em;"><code class="inline">html.head</code>: lines added to the head element of the card&#x27;s file, for   example, to include a script. Inherited.</p>
+<a name="html-00014"></a><p style="margin-left: 3em;"><code class="inline">html.title</code>: a prefix for the title of each HTML file. Inherited.</p>
+<a name="html-00015"></a><p style="margin-left: 3em;"><code class="inline">html.file</code> and <code class="inline">html.anchor</code> on a card, <code class="inline">html.anchor</code> on a fragment:   override the file name and the anchor names.</p>
+<a name="html-00016"></a><p>The style sheet starts with built-in rules, which <code class="inline">html.style</code> can override. The following elements and classes are used by the generated HTML:</p>
+<a name="html-00017"></a><p style="margin-left: 3em;">– <code class="inline">.column</code>: the column containing a card; <code class="inline">header</code> and <code class="inline">footer</code>: its   header and footer;</p>
+<a name="html-00018"></a><p style="margin-left: 3em;">– <code class="inline">code.inline</code>: inline code produced by the <code class="inline">cd</code> style;</p>
+<a name="html-00019"></a><p style="margin-left: 3em;">– <code class="inline">span.annotation</code>: text with a note attached, and the notes themselves;</p>
+<a name="html-00020"></a><p style="margin-left: 3em;">– <code class="inline">span.linktarget</code>: the target span of a link;</p>
+<a name="html-00021"></a><p style="margin-left: 3em;">– <code class="inline">.margin-left</code> and <code class="inline">.margin-right</code>: the left and right margins, holding   link marks, fragment identifiers and notes; <code class="inline">span.frag-id</code>: a fragment   identifier;</p>
+<a name="html-00022"></a><p style="margin-left: 3em;">– <code class="inline">.align-left</code>, <code class="inline">.align-right</code> and <code class="inline">.align-centre</code>: the alignment styles;</p>
+<a name="html-00023"></a><p style="margin-left: 3em;">– <code class="inline">table.no-borders</code>: the tables of the series and tag indices.</p><footer><a href="math.html#math">&lt;</a>&nbsp;<a href="series_trunk.html">trunk</a>&nbsp;<a href="phases.html#phases">&gt;</a>&nbsp;&nbsp;&nbsp;<a href="series.html#series">&lt;</a>&nbsp;<a href="series_reference.html">reference</a>&nbsp;&gt;&nbsp;&nbsp;&nbsp;</footer></div><p>&nbsp;</p>\( \def\Bag{\operatorname{Bag}} \)
+\( \def\foo{\operatorname{foo}} \)
+<div class="column"><header>Mathematics</header>
+<a name="math-top"></a><p>card relies on <a href="https://www.mathjax.org/">MathJax</a> for mathematics. A card that contains mathematics loads <a href="https://www.mathjax.org/">MathJax</a> automatically.</p>
+<a name="math-00001"></a><p>Display formulae are written in <code class="inline">math</code> fragments, in TeX notation:</p>
+<a name="math-00002"></a><pre><code>; math
+\Bag(x) = e^x = 1 + x + \frac{x^2}{2!} + \frac{x^3}{3!} + \cdots + \frac{x^n}{n!} + \cdots</code></pre>
+<a name="math-00003"></a><p>which gives</p>
+<a name="math-00004"></a>$$\Bag(x) = e^x = 1 + x + \frac{x^2}{2!} + \frac{x^3}{3!} + \cdots + \frac{x^n}{n!} + \cdots$$
+<a name="math-00005"></a><p>Inline formulae, like \(e^{i\pi} + 1 = 0\) or \(\foo(x)\), are written in a paragraph using the usual TeX inline delimiters, a backslash followed by an opening parenthesis and a backslash followed by a closing parenthesis. For card to notice them, there must be an <code class="inline">ma</code> style matching them (see <a href="styles.html#styles-top">Styles</a>). This manual uses</p>
+<a name="math-00006"></a><pre><code>/// +ma \\\((?P&lt;open&gt;)[^\\]*(?P&lt;close&gt;)\\\)</code></pre>
+<a name="math-00007"></a><p>Note that this expression does not allow backslashes inside an inline formula. This does not matter as long as the card has some other formula that the expression does match: MathJax, once loaded, typesets all formulae in the page.</p>
+<a name="math-00008"></a><p>Styles are applied inside inline formulae as well, and <code class="inline">ma</code> is applied after the other styles. With the manual&#x27;s definitions, the minus signs in the following formula are taken for underline markers and removed:</p>
+<a name="math-00009"></a><pre><code>\(a - b - c\)</code></pre>
+<a name="math-00010"></a><p>Avoid characters used as style markers in inline formulae, or put such formulae in <code class="inline">math</code> fragments.</p>
+<a name="math-00011"></a><p>Macros are defined with the <code class="inline">TeX</code> attribute. Its values are emitted at the top of a card containing mathematics. The attribute is inherited, so macros needed throughout the deck can be defined as deck attributes, while macros specific to a card are defined on the card:</p>
+<a name="math-00012"></a><pre><code>/// +TeX \( \def\foo{\operatorname{foo}} \)
+// +TeX \( \def\Bag{\operatorname{Bag}} \)</code></pre><footer><a href="series.html#series">&lt;</a>&nbsp;<a href="series_trunk.html">trunk</a>&nbsp;<a href="html.html#html">&gt;</a>&nbsp;&nbsp;&nbsp;</footer></div><p>&nbsp;</p><div class="column"><header>Series and tags</header>
+<a name="series-top"></a><p>Cards are organised in two ways: by series and by tags.</p>
+<a name="series-00001"></a><p>A series is an ordered sequence of cards. A card is placed in a series by the <code class="inline">#</code> attribute, whose value is the name of the series and the position of the card in it:</p>
+<a name="series-00002"></a><pre><code>// +# trunk 07
+// +# chrono 2025/04/01</code></pre>
+<a name="series-00003"></a><p>A card can be in any number of series, but only once in each. Positions within a series must be unique and are compared as strings, so use zero-padded numbers (&quot;07&quot;, not &quot;7&quot;) or ISO dates. If the position is omitted, the identifier of the card is used.</p>
+<a name="series-00004"></a><p>The footer of each card links it to the previous and the following cards in each series the card belongs to, and to the index of the series. For each series, the HTML engine generates an index file, listing all the cards in the series with their titles, briefs and tags. The brief is cut to its first 80 characters, so keep <code class="inline">brief</code> attributes short. The index comes in several variants (compact or full, in direct or reverse order, as a table or &quot;flat&quot;, that is, with the full text of all cards), and each variant links to the others.</p>
+<a name="series-00005"></a><p>Tags are keywords. A card is tagged with the <code class="inline">tags</code> attribute:</p>
+<a name="series-00006"></a><pre><code>// +tags concepts
+// +tags syntax</code></pre>
+<a name="series-00007"></a><p>For each tag, the HTML engine generates an index file listing the tagged cards.</p>
+<a name="series-00008"></a><p>The series named &quot;timeline&quot; is special: it is used to produce the RSS feed. Each card in this series becomes an item in feed.xml, and the first ten characters of the position are used as the publication date. Use positions like &quot;2025-04-01&quot; or &quot;2025-04-01 12:30&quot; for timeline cards and set the <code class="inline">deck.url</code> deck attribute. Note that the date is written to the feed as is, not in the RFC 822 format required by RSS, so some feed readers may reject the feed.</p><footer><a href="styles.html#styles">&lt;</a>&nbsp;<a href="series_trunk.html">trunk</a>&nbsp;<a href="math.html#math">&gt;</a>&nbsp;&nbsp;&nbsp;<a href="styles.html#styles">&lt;</a>&nbsp;<a href="series_reference.html">reference</a>&nbsp;<a href="html.html#html">&gt;</a>&nbsp;&nbsp;&nbsp;</footer></div><p>&nbsp;</p><div class="column"><header>Styles</header>
+<a name="styles-top"></a><p>card has no built-in inline markup. Instead, <i>styles</i> are defined by attributes, whose values are regular expressions. The following styles are available:</p>
+<a name="styles-00001"></a><p style="margin-left: 3em;"><code class="inline">em</code>: emphasis. <code class="inline">it</code>: italics. <code class="inline">bd</code>: bold. <code class="inline">un</code>: underline. <code class="inline">cd</code>: inline   code. <code class="inline">ma</code>: inline mathematics (see <a href="math.html#math-top">Mathematics</a>). <code class="inline">al</code>, <code class="inline">ar</code>, <code class="inline">ac</code>: align   the text to the left, right or centre.</p>
+<a name="styles-00002"></a><p>The regular expression must contain two named groups: <code class="inline">open</code> and <code class="inline">close</code>. The text matched by these groups is removed from the output, and the text between them is rendered in the style. This manual uses (in <a href="https://github.com/nikitadanilov/card/blob/master/self.conf">self.conf</a>)</p>
+<a name="styles-00003"></a><pre><code>/// +it (^|[ ])(?P&lt;open&gt;_)[^_]*(?P&lt;close&gt;_)
+/// +em (^|[ ])(?P&lt;open&gt;\*)[^*]*(?P&lt;close&gt;\*)
+/// +un (^|[ ])(?P&lt;open&gt;-)[^-]*(?P&lt;close&gt;-)
+/// +cd (^|[ ])(?P&lt;open&gt;`)[^`]*(?P&lt;close&gt;`)</code></pre>
+<a name="styles-00004"></a><p>so that underscores make italics, asterisks make emphasis and so on. The groups can be empty, in which case nothing is removed and the matched text is simply styled. This is used to italicise Latin abbreviations and to typeset anything that looks like a function call as code:</p>
+<a name="styles-00005"></a><pre><code>/// +cd (^|[ ])(?P&lt;open&gt;)[a-zA-Z0-9_.:]+\(\)(?P&lt;close&gt;)(?=[- .;!?]|$)
+/// +it (?P&lt;open&gt;)e\.g\.(?P&lt;close&gt;)(?=, )</code></pre>
+<a name="styles-00006"></a><p>Styles are inherited, so a style can be defined for the whole deck, for a card or for a single fragment. Styles are applied to paragraphs and notes only, not to code, math or headings.</p>
+<a name="styles-00007"></a><p>Styles are applied in a fixed order: <code class="inline">em</code>, <code class="inline">it</code>, <code class="inline">bd</code>, <code class="inline">un</code>, <code class="inline">cd</code>, <code class="inline">ma</code>, then the alignments; within one style, the expressions are tried in the order of their definition, the most specific node first. Once a style removes its markers, the later styles no longer see them, so if two styles use the same characters, only the first one has any effect.</p>
+<a name="styles-00008"></a><p>Be careful with the expressions: they are applied to the whole paragraph text. With the definitions above, a dash at the beginning of a word starts an underlined span that ends at the next dash in the paragraph. This is why this manual uses en dashes (–) for its lists.</p><footer><a href="notes.html#notes">&lt;</a>&nbsp;<a href="series_trunk.html">trunk</a>&nbsp;<a href="series.html#series">&gt;</a>&nbsp;&nbsp;&nbsp;<a href="notes.html#notes">&lt;</a>&nbsp;<a href="series_reference.html">reference</a>&nbsp;<a href="series.html#series">&gt;</a>&nbsp;&nbsp;&nbsp;</footer></div><p>&nbsp;</p><div class="column"><header>Notes</header>
+<a name="notes-top"></a><p>A note is a short text attached to a part of a fragment. The HTML engine renders notes on the right margin and underlines the part of the text they are attached to. Each note gets a colour from a cycle of six, so neighbouring notes are usually distinguishable. A note is created with</p>
+<a name="notes-00001"></a><pre><code>/ +* &quot;REGEX&quot; TEXT</code></pre>
+<a name="notes-00002"></a><p>where REGEX selects the part of the fragment to which the note is attached (the same rules as for the spans in links apply, see <a href="links.html#links-top">Links</a>) and TEXT is the text of the note, extending to the end of the line. Note text is subject to styles. Lines starting with <code class="inline">:</code> that immediately follow set attributes of the note, for example its identifier. Example:</p>
+<a name="notes-00003"></a><pre><code style="margin-left: 6em;">This paragraph talks about one thing and then another thing. A lot of
+marginalia are inserted here for demonstration purposes.
+/ +* &quot;one thing&quot; Also described in the next paragraph
+: id one
+/ +* &quot;another thing&quot; Which is actually a _generalisation_ of the one thing.
+/ += !phases-syntax &quot;sentences&quot; -&gt; . &quot;marginalia&quot;
+/ += https://www.example.com -&gt; . &quot;inserted&quot;
+/ +* &quot;then&quot; Add more colours.
+/ +* &quot;demonstration&quot; Add even more colours.
+/ +* &quot;purposes&quot; And more</code></pre><p class="margin-left"><span class="annotation" data-uid="1">[<a href="phases.html#phases-syntax"><span style="color: blue">0</span></a>]</span>&nbsp;<span class="annotation" data-uid="2">[<a href="https://www.example.com"><span style="color: red">1</span></a>]</span>&nbsp;</p><p class="margin-right"><span class="annotation" data-uid="4">Also described in the next paragraph</span>&nbsp;<br><span class="annotation" data-uid="5">Add more colours.</span>&nbsp;<br><span class="annotation" data-uid="0">Which is actually a <i>generalisation</i> of the one thing.</span>&nbsp;<br><span class="annotation" data-uid="3">Add even more colours.</span>&nbsp;<br><span class="annotation" data-uid="4">And more</span>&nbsp;<br></p>
+<a name="notes-demo"></a><p style="margin-left: 6em;">The result looks like this: This paragraph talks about <span class="annotation" data-uid="4">one thing</span> and <span class="annotation" data-uid="5">then</span>   <span class="annotation" data-uid="0">another thing</span>. A lot of <span class="linktarget" data-uid="1">marginalia</span> are <span class="linktarget" data-uid="2">inserted</span> here for <span class="annotation" data-uid="3">demonstration</span>   <span class="annotation" data-uid="4">purposes</span>.</p>
+<a name="notes-00005"></a><p>The note&#x27;s regular expression cannot contain a double quote.</p>
+<a name="notes-00006"></a><p>If you compare the example with the source of this card, you will see that the two link lines are not attached to the result paragraph itself. They are attached to the paragraph after it and refer to the result as &quot;!notes-demo&quot; instead of &quot;.&quot;. This works around a bug in the current version: a fragment&#x27;s link attributes are also applied to each of its notes, so on a fragment with notes, links like these come out duplicated and nested.</p>
+<a name="notes-00007"></a><p>Notes can contain hyperlinks. A link is added to a note by a <code class="inline">:</code> line, in the same way as a link is added to a fragment by a <code class="inline">/</code> line. In a note&#x27;s link attribute, <code class="inline">.</code> refers to the note itself:</p>
+<a name="notes-00008"></a><pre><code>/ +* &quot;REGEX&quot; TEXT
+: += . &quot;REGEX&quot; -&gt; TARGET</code></pre><p class="margin-right"><span class="annotation" data-uid="5">See <a href="links.html#links-top">Links</a> for the details.</span>&nbsp;<br></p>
+<a name="notes-linkdemo"></a><p>For example, this sentence has <span class="annotation" data-uid="5">a note with a link</span>.</p>
+<a name="notes-00010"></a><p>is produced by</p>
+<a name="notes-00011"></a><pre><code>For example, this sentence has a note with a link.
+/ id linkdemo
+/ +* &quot;a note with a link&quot; See Links for the details.
+: id see
+: += . &quot;Links&quot; -&gt; !links-top</code></pre>
+<a name="notes-00012"></a><p>The <code class="inline">:</code> lines must immediately follow the note&#x27;s <code class="inline">/ +*</code> line (or each other). A link attribute can also be attached to any other fragment and refer to the note by its identifier, which is how links into notes of other cards are made:</p>
+<a name="notes-00013"></a><pre><code>/ += !notes-linkdemo-see &quot;Links&quot; -&gt; !links-top</code></pre>
+<a name="notes-00014"></a><p>Links defined on the card or on the deck, including automatic links, apply to notes as well, and, as described above, so do the link attributes of the note&#x27;s fragment.</p>
+<a name="notes-00015"></a><p>A span in a note can only be the source of a link. The target can be a URL, a fragment or a span in a fragment. In the latter case, the numbered mark in the left margin, which normally links back to the source, leads nowhere, because notes have no HTML anchors. A span in a note cannot be the target of a link: card fails with an AttributeError.</p><footer><a href="links.html#links">&lt;</a>&nbsp;<a href="series_trunk.html">trunk</a>&nbsp;<a href="styles.html#styles">&gt;</a>&nbsp;&nbsp;&nbsp;<a href="links.html#links">&lt;</a>&nbsp;<a href="series_reference.html">reference</a>&nbsp;<a href="styles.html#styles">&gt;</a>&nbsp;&nbsp;&nbsp;</footer></div><p>&nbsp;</p><div class="column"><header>Links</header>
+<a name="links-top"></a><p>A link connects two <i>places</i>: the source and the target. Links are added by <code class="inline">+=</code> attributes. A link attribute value has the following grammar:</p>
+<a name="links-00001"></a><pre><code style="margin-left: 3em;">LINK           ::= SOURCE &#x27;-&gt;&#x27; TARGET
+SOURCE, TARGET ::= URL | DECK_LOCATION
+DECK_LOCATION  ::= NODE [SPAN]
+NODE           ::= &#x27;.&#x27; | &#x27;!&#x27; IDENTIFIER
+SPAN           ::= &#x27;&quot;&#x27; REGEX &#x27;&quot;&#x27;</code></pre>
+<a name="links-00002"></a><p><code class="inline">.</code> refers to the current node: the fragment to which the attribute is attached. <code class="inline">! IDENTIFIER</code> refers to the node with the given identifier (see <a href="ids.html#ids-top">Identifiers</a>). A span is a regular expression (in <a href="https://docs.python.org/3/library/re.html">Python syntax</a>) that selects a part of the text of the node. Anything that does not start with <code class="inline">.</code> or <code class="inline">!</code> is a URL. Examples:</p>
+<a name="links-00003"></a><pre><code style="margin-left: 3em;">\
+// id CARD0
+
+Add a link to a web-page here ...
+/ id PARA0
+/ += . &quot;here&quot; -&gt; https://www.example.com
+
+Another paragraph. Link _to_ it from a particular text in the previous paragraph.
+/ += !CARD0-PARA0 &quot;a link&quot; -&gt; . &quot;Link&quot;</code></pre><p class="margin-left"><span class="annotation" data-uid="1">[<a href="https://www.example.com"><span style="color: blue">0</span></a>]</span>&nbsp;</p>
+<a name="links-00004"></a><p>When a span is the source of a link (<i>i.e.</i>, when it is on the left-hand side of <code class="inline">-&gt;</code>), the HTML engine turns the matched text into a hyperlink, like <a href="https://www.example.com">here</a>. When a span is the target of a link, the matched text <span class="linktarget" data-uid="1">is underlined</span> and a numbered marginal mark linking back to the source is inserted on the left. If the target is a node without a span, the hyperlink leads to the node&#x27;s anchor.</p>
+<a name="links-00005"></a><p>The regular expression is matched against the text of the fragment as it is written in the cardfile, before styles are applied, so the source markup characters (like underscores and asterisks) are visible to it. Every match of the expression gets the link, so make the expression specific enough. Use lookaheads and lookbehinds to select a word in a particular context, as in the &quot;EVCOMB(?=:)&quot; example on the <a href="syntax.html#syntax-top">Syntax</a> card. Remember that the lines of a paragraph are joined with a space, but leading blanks are preserved: use <code class="inline">\s+</code> rather than a single space to match words that can be split across lines.</p>
+<a name="links-00006"></a><p>The URL can refer to the named groups of the expression at the other end with Python format syntax. Together with the inheritance of links, this gives <i>automatic links</i>. A link attribute set on a card applies to every fragment of the card, and one set on the deck applies to every fragment of the deck. This manual&#x27;s <a href="https://github.com/nikitadanilov/card/blob/master/self.conf">self.conf</a> contains:</p>
+<a name="links-00007"></a><pre><code>/// += . &quot;(?P&lt;type&gt;str|dict|set|list)\.(?P&lt;func&gt;[a-z.A-Z_0-9]+)\(\)&quot; -&gt; https://docs.python.org/3/library/stdtypes.html#{type}.{func}
+/// += . &quot;\bcard\.(?P&lt;code&gt;[a-z.A-Z_0-9]+)\(\)&quot; -&gt; https://raw.githubusercontent.com/nikitadanilov/card/refs/heads/master/card#:~:text={code}</code></pre>
+<a name="links-00008"></a><p>which is how the mentions of <a href="https://docs.python.org/3/library/stdtypes.html#str.split"><code class="inline">str.split()</code></a> and <a href="https://raw.githubusercontent.com/nikitadanilov/card/refs/heads/master/card#:~:text=compile_deck"><code class="inline">card.compile_deck()</code></a> get their hyperlinks. Because the URL of a link with a span at the other end always goes through Python formatting, literal braces in such a URL must be doubled: write &quot;{{&quot; and &quot;}}&quot; for &quot;{&quot; and &quot;}&quot;. Otherwise card fails with a KeyError (or IndexError, or ValueError).</p>
+<a name="links-00009"></a><p>The link attribute does not have to be attached to either end of the link. For example, the following attribute, attached to some fragment, links a word in the fragment with identifier &quot;phases-syntax&quot; to a word in the attached fragment:</p>
+<a name="links-00010"></a><pre><code>/ += !phases-syntax &quot;sentences&quot; -&gt; . &quot;marginalia&quot;</code></pre>
+<a name="links-00011"></a><p>This works on a fragment, but not on a card or the deck. A link set on a card or the deck is created anew for every fragment below it. That is what makes automatic links with <code class="inline">.</code> work, but a link with an explicit &quot;!&quot; end set on a card produces as many copies of the same link as the card has fragments. Put such links on a fragment.</p>
+<a name="links-00012"></a><p>Note that the source end of a link (the regular expression or the URL) cannot contain &quot;-&gt;&quot;, and identifiers cannot contain spaces.</p><footer><a href="ids.html#ids">&lt;</a>&nbsp;<a href="series_trunk.html">trunk</a>&nbsp;<a href="notes.html#notes">&gt;</a>&nbsp;&nbsp;&nbsp;<a href="attributes.html#attributes">&lt;</a>&nbsp;<a href="series_reference.html">reference</a>&nbsp;<a href="notes.html#notes">&gt;</a>&nbsp;&nbsp;&nbsp;</footer></div><p>&nbsp;</p><div class="column"><header>Identifiers</header>
+<a name="ids-top"></a><p>Every card, fragment and note has a unique identifier. Identifiers are used to refer to nodes in links and to name the output files and anchors.</p>
+<a name="ids-00001"></a><p>The identifier of a card is the value of its <code class="inline">id</code> attribute. If the card has no <code class="inline">id</code>, the identifier is made of the cardfile name and the sequential number of the card in the file: the third card of notes.deck is &quot;notes.deck-00002&quot;.</p>
+<a name="ids-00002"></a><p>The identifier of a fragment is the identifier of its card, a dash and the fragment&#x27;s <code class="inline">id</code> attribute. If the fragment has no <code class="inline">id</code> attribute, its five-digit sequential number in the card, counting from zero, is used instead. For example, the first fragment of this card has <code class="inline">/ id top</code>, so its identifier is &quot;ids-top&quot;, while this paragraph is &quot;ids-00002&quot;.</p>
+<a name="ids-00003"></a><p>The identifier of a note is formed in the same way from the identifier of its fragment: FRAGMENT-ID followed by a dash and the note&#x27;s <code class="inline">id</code> attribute, or, if the note has none, FRAGMENT-ID-note-00000, FRAGMENT-ID-note-00001 and so on. Note, however, that no HTML anchor is written for notes, so a link whose target is a whole note leads nowhere.</p>
+<a name="ids-00004"></a><p>Identifiers must be unique in the deck. Identifiers containing spaces cannot be used in links, so do not use them.</p>
+<a name="ids-00005"></a><p>Automatically generated identifiers change when cards and fragments are added or moved, so any node that is the target of a link should be given an explicit <code class="inline">id</code>. To find the identifier of a fragment, set</p>
+<a name="ids-00006"></a><pre><code>/// +frag.id.show +</code></pre>
+<a name="ids-00007"></a><p>and the identifiers will be displayed in the left margin of the output.</p><footer><a href="attributes.html#attributes">&lt;</a>&nbsp;<a href="series_trunk.html">trunk</a>&nbsp;<a href="links.html#links">&gt;</a>&nbsp;&nbsp;&nbsp;</footer></div><p>&nbsp;</p><div class="column"><header>Attributes</header>
+<a name="attributes-top"></a><p>Attributes are key-value pairs attached to nodes. card uses some of the attributes to drive the layout and its rendering by the engine. Other attributes can be used by the user for any purpose:</p>
+<a name="attributes-attrs"></a><pre><code>/ C Attribute &quot;C&quot; is not used by card. So it can be used to add comments
+/ C to the cardfile. All hail FORTRAN!</code></pre>
+<a name="attributes-00002"></a><p>An attribute is either a single value (set with <code class="inline">key value</code>) or a list of values (extended with <code class="inline">+key value</code>). Setting a single-valued attribute again replaces the old value.</p>
+<a name="attributes-00003"></a><p><em>List attributes must always be set with the plus sign</em>, even when there is only one value. card does not complain otherwise, but it treats the string as a list of characters: <code class="inline">// tags foo</code> tags the card with &quot;f&quot; and &quot;o&quot; (twice). Conversely, <code class="inline">+key</code> after a plain <code class="inline">key</code> fails with a TypeError. In the reference below, list attributes are marked [list].</p>
+<a name="attributes-00004"></a><p>Many list attributes are also <i>inherited</i>: when card looks up such an attribute for a fragment, it combines the values set on the fragment itself, on its card and on the deck. This is how styles and automatic links defined once in a configuration file apply to every fragment of the deck. Inherited attributes are marked [inherited] below. They can be set on the deck, on a card or on a fragment.</p>
+<a name="attributes-00005"></a><p>Deck attributes:</p>
+<a name="attributes-00006"></a><p style="margin-left: 3em;"><code class="inline">dir</code>: the output directory, relative to the current directory. &quot;html_out&quot; by   default. Use &quot;.&quot; to write into the current directory.</p>
+<a name="attributes-00007"></a><p style="margin-left: 3em;"><code class="inline">engine</code>: the output engine. Only &quot;html&quot; (the default) is available.</p>
+<a name="attributes-00008"></a><p style="margin-left: 3em;"><code class="inline">deck.title</code>: the title of the deck, used in the RSS feed and in the   reference to the feed from every page.</p>
+<a name="attributes-00009"></a><p style="margin-left: 3em;"><code class="inline">deck.description</code>: the description of the deck, used in the RSS feed.</p>
+<a name="attributes-00010"></a><p style="margin-left: 3em;"><code class="inline">deck.url</code>: the public URL of the output directory. Used to refer to the RSS   feed from every page and in the feed itself. Required if any card is in the   &quot;timeline&quot; series (see <a href="series.html#series-top">Series and tags</a>).</p>
+<a name="attributes-00011"></a><p style="margin-left: 3em;"><code class="inline">html.style</code> [list]: CSS appended to the generated style sheet. See HTML   output.</p>
+<a name="attributes-00012"></a><p style="margin-left: 3em;"><code class="inline">html.style.file</code>: the name of the generated style sheet, &quot;style.css&quot; by   default.</p>
+<a name="attributes-00013"></a><p style="margin-left: 3em;"><code class="inline">html.series_compact</code>, <code class="inline">html.series_reverse</code>, <code class="inline">html.series_flat</code>: when set   to a non-empty value, the series links in card footers point to the   compact, reversed or flat variant of the series index.</p>
+<a name="attributes-00014"></a><p>Inherited attributes, usually set on the deck:</p>
+<a name="attributes-00015"></a><p style="margin-left: 3em;"><code class="inline">em</code>, <code class="inline">it</code>, <code class="inline">bd</code>, <code class="inline">un</code>, <code class="inline">cd</code>, <code class="inline">ma</code>, <code class="inline">al</code>, <code class="inline">ar</code>, <code class="inline">ac</code> [list, inherited]: style   definitions, see <a href="styles.html#styles-top">Styles</a>.</p>
+<a name="attributes-00016"></a><p style="margin-left: 3em;"><code class="inline">=</code> [list, inherited]: a link, see <a href="links.html#links-top">Links</a>. Always written as <code class="inline">+=</code>.</p>
+<a name="attributes-00017"></a><p style="margin-left: 3em;"><code class="inline">TeX</code> [list, inherited]: TeX definitions emitted at the top of a card if it   contains mathematics, see <a href="math.html#math-top">Mathematics</a>.</p>
+<a name="attributes-00018"></a><p style="margin-left: 3em;"><code class="inline">html.head</code> [list, inherited]: lines added to the head element of each HTML   file.</p>
+<a name="attributes-00019"></a><p style="margin-left: 3em;"><code class="inline">html.title</code> [list, inherited]: a prefix for the title of each HTML file.</p>
+<a name="attributes-00020"></a><p style="margin-left: 3em;"><code class="inline">frag.id.show</code> [list, inherited]: if the first value found is &quot;+&quot;, the   identifier of each fragment is shown in the left margin. Handy when writing   links.</p>
+<a name="attributes-00021"></a><p>Card attributes:</p>
+<a name="attributes-00022"></a><p style="margin-left: 3em;"><code class="inline">name</code>: the title of the card, shown in its header, in the HTML title and in   the indices.</p>
+<a name="attributes-00023"></a><p style="margin-left: 3em;"><code class="inline">label</code>: the title of the card if <code class="inline">name</code> is not set. If neither is set, the   title is &quot;Card&quot; followed by the identifier.</p>
+<a name="attributes-00024"></a><p style="margin-left: 3em;"><code class="inline">id</code>: the identifier of the card (see <a href="ids.html#ids-top">Identifiers</a>).</p>
+<a name="attributes-00025"></a><p style="margin-left: 3em;"><code class="inline">brief</code>: a short description of the card, shown in the indices. If not set,   the beginning of the card&#x27;s text is used.</p>
+<a name="attributes-00026"></a><p style="margin-left: 3em;"><code class="inline">tags</code> [list]: keywords under which the card is indexed:</p>
+<a name="attributes-00027"></a><pre><code style="margin-left: 6em;">&quot;The only way to make a man trustworthy is to trust him.&quot;
+// +tags Stimson
+// +tags platitudes</code></pre>
+<a name="attributes-00028"></a><p style="margin-left: 3em;"><code class="inline">#</code> [list]: the position of the card in a series:</p>
+<a name="attributes-00029"></a><pre><code style="margin-left: 6em;">\
+// name Card Number Three
+// +# trunk 03
+// +# chrono 2025/04/01</code></pre>
+<a name="attributes-00030"></a><p style="margin-left: 6em;">Attributes above place &quot;Card Number Three&quot; at position &quot;03&quot; in the &quot;trunk&quot;   series and at position &quot;2025/04/01&quot; in the &quot;chrono&quot; series.   See <a href="series.html#series-top">Series and tags</a>.</p>
+<a name="attributes-00031"></a><p style="margin-left: 3em;"><code class="inline">html.style</code> [list]: CSS placed in a style element in the card&#x27;s file.</p>
+<a name="attributes-00032"></a><p style="margin-left: 3em;"><code class="inline">html.file</code>: the name of the output file of the card. Derived from the   identifier by default.</p>
+<a name="attributes-00033"></a><p style="margin-left: 3em;"><code class="inline">html.anchor</code>: the HTML anchor of the card. The identifier by default.</p>
+<a name="attributes-00034"></a><p>Fragment attributes:</p>
+<a name="attributes-00035"></a><p style="margin-left: 3em;"><code class="inline">id</code>: the identifier of the fragment (see Identifiers).</p>
+<a name="attributes-00036"></a><p style="margin-left: 3em;"><code class="inline">level</code>: the heading level of a <code class="inline">head</code> fragment.</p>
+<a name="attributes-00037"></a><p style="margin-left: 3em;"><code class="inline">url</code>: the source of the image of an <code class="inline">img</code> fragment.</p>
+<a name="attributes-00038"></a><p style="margin-left: 3em;"><code class="inline">width</code>: the width of the image of an <code class="inline">img</code> fragment.</p>
+<a name="attributes-00039"></a><p style="margin-left: 3em;"><code class="inline">html.style</code> [list]: inline CSS style of the fragment. Ignored for headings   and display formulae.</p>
+<a name="attributes-00040"></a><p style="margin-left: 3em;"><code class="inline">html.anchor</code>: the HTML anchor of the fragment. The identifier by default.</p>
+<a name="attributes-00041"></a><p style="margin-left: 3em;"><code class="inline">&gt;</code>: the indentation level, set by the parser from the leading <code class="inline">&gt;</code>-s.</p>
+<a name="attributes-00042"></a><p style="margin-left: 3em;"><code class="inline">+*</code> is not an attribute, despite the similar syntax: it creates a note, see   <a href="notes.html#notes-top">Notes</a>.</p>
+<a name="attributes-00043"></a><p>Any node:</p>
+<a name="attributes-00044"></a><p style="margin-left: 3em;"><code class="inline">DEBUG</code>: the debugging level of the node, see <a href="debug.html#debug-top">Debugging and caveats</a>. Not   inherited.</p>
+<a name="attributes-00045"></a><p>Finally, card sets a few attributes itself: <code class="inline">file</code>, <code class="inline">seq</code>, <code class="inline">mtime</code> and <code class="inline">ctime</code> of a card are the name of the cardfile it came from, its sequential number in that file and the modification and change times of the file. <code class="inline">seq</code> of a fragment is its position in the card, and <code class="inline">seq</code> of a note is its position in the fragment. The HTML engine also sets <code class="inline">card-title</code> on cards and <code class="inline">html.file</code> and <code class="inline">html.anchor</code> on every card, fragment and note. Treat all these names as reserved.</p><footer><a href="fragments.html#fragments">&lt;</a>&nbsp;<a href="series_trunk.html">trunk</a>&nbsp;<a href="ids.html#ids">&gt;</a>&nbsp;&nbsp;&nbsp;<a href="fragments.html#fragments">&lt;</a>&nbsp;<a href="series_reference.html">reference</a>&nbsp;<a href="links.html#links">&gt;</a>&nbsp;&nbsp;&nbsp;</footer></div><p>&nbsp;</p><div class="column"><header>Fragments</header>
+<a name="fragments-top"></a><p>A fragment is the unit of content within a card. The type of a fragment is given by the <code class="inline">;</code> line preceding it. The following types are supported.</p>
+<a name="fragments-00001"></a><p style="margin-left: 3em;"><code class="inline">para</code>: a text paragraph. This is the default type. The lines of a paragraph   are joined into one line and the result is subject to styles, links and   notes.</p>
+<a name="fragments-00002"></a><p style="margin-left: 3em;"><code class="inline">code</code>: a display of preformatted text. Lines are kept exactly as written   (modulo the leading <code class="inline">|</code> and <code class="inline">&gt;</code>-s). Links and notes are applied to code   displays, but styles are not.</p>
+<a name="fragments-00003"></a><p style="margin-left: 3em;"><code class="inline">math</code>: a display formula in TeX notation. See <a href="math.html#math-top">Mathematics</a>.</p>
+<a name="fragments-00004"></a><p style="margin-left: 3em;"><code class="inline">head</code>: a heading. The <code class="inline">level</code> attribute sets the heading level (1 by   default):</p>
+<a name="fragments-00005"></a><pre><code style="margin-left: 6em;">; head
+/ level 2
+Inner workings</code></pre>
+<a name="fragments-00006"></a><p style="margin-left: 3em;"><code class="inline">img</code>: an image. The image is given by the <code class="inline">url</code> attribute, and its width by   the <code class="inline">width</code> attribute (&quot;50%&quot; by default). The width is written into the   width attribute of the HTML img element, so use a number of pixels or a   percentage, not an arbitrary CSS length. The text of the fragment, if any,   is rendered right after the image, in the same centred line, so it ends up   beside the image if there is room and below it otherwise:</p>
+<a name="fragments-00007"></a><pre><code style="margin-left: 6em;">; img
+/ url https://upload.wikimedia.org/wikipedia/commons/4/47/PNG_transparency_demonstration_1.png
+/ width 30%
+Two dice.</code></pre>
+<a name="fragments-00008"></a><p>Paragraphs, code displays and images can be indented. The number of <code class="inline">&gt;</code> characters at the beginning of a line of text sets the indentation level of the whole fragment. Each level is 3em in the HTML output. The indentation of headings and display formulae is silently ignored. Indentation is used in this manual for lists: card has no special list syntax; a list is just a sequence of indented paragraphs that start with a dash. If several lines of a fragment start with <code class="inline">&gt;</code>, the last one wins. Code displays can be indented in the same way: put the <code class="inline">&gt;</code>-s on the first line of the code, as in the examples above.</p><footer><a href="syntax.html#syntax">&lt;</a>&nbsp;<a href="series_trunk.html">trunk</a>&nbsp;<a href="attributes.html#attributes">&gt;</a>&nbsp;&nbsp;&nbsp;<a href="syntax.html#syntax">&lt;</a>&nbsp;<a href="series_reference.html">reference</a>&nbsp;<a href="attributes.html#attributes">&gt;</a>&nbsp;&nbsp;&nbsp;</footer></div><p>&nbsp;</p><div class="column"><header>Syntax</header>
+<a name="syntax-top"></a><p>The cardfile syntax is extremely simple and line-oriented. The first word of a line (that is, its first sequence of non-blank characters) determines what the line means.</p>
+<a name="syntax-00001"></a><p style="margin-left: 3em;">– An empty line marks the end of the previous fragment (if any). Multiple empty   lines count as one.</p>
+<a name="syntax-00002"></a><p style="margin-left: 3em;">– A line starting with a <code class="inline">;</code> specifies the type of the immediately following   fragment (one of <code class="inline">para</code>, <code class="inline">code</code>, <code class="inline">math</code>, <code class="inline">head</code> or <code class="inline">img</code>, see <a href="fragments.html#fragments-top">Fragments</a>):</p>
+<a name="syntax-00003"></a><pre><code style="margin-left: 3em;">; code
+EVCOMB: ARGS := &#x27;()
+EVCOM1: TYPE-DISPATCH ON EXP INTO
+                &quot;COMBINATION&quot;: GOTO EVCOM2
+                &quot;FUNCALL&quot;: GOTO CALL
+                &quot;CONS&quot;: GOTO CONS
+                &quot;CAR&quot;: GOTO CAR
+                &quot;CDR&quot;: GOTO CDR
+        HCTAPSID-EPYT
+/ += . &quot;EVCOMB(?=:)&quot; -&gt; https://dl.acm.org/doi/pdf/10.1145/359024.359031
+
+; para
+The previous fragment was a block display of code with an embedded link. This
+fragment is a text paragraph.</code></pre>
+<a name="syntax-00004"></a><p style="margin-left: 3em;">If the fragment type is not specified, the next fragment will be a paragraph.</p>
+<a name="syntax-00005"></a><pre><code style="margin-left: 3em;">; para
+This fragment is a text paragraph.
+
+This fragment is a text paragraph too.</code></pre>
+<a name="syntax-00006"></a><p style="margin-left: 3em;">– A line starting with a <code class="inline">\</code> indicates the beginning of a new card. This makes   it possible to have multiple cards in one file. Each cardfile starts a new   card implicitly.</p>
+<a name="syntax-00007"></a><p style="margin-left: 3em;">– A line starting with <code class="inline">///</code> is a deck attribute. A line starting with a <code class="inline">//</code> is   a card attribute and a line starting with <code class="inline">/</code> is a fragment attribute. All   attributes have the same syntax: the key and the value separated by spaces. If   the key starts with <code class="inline">+</code>, the value is added to the list of values for the   key (with <code class="inline">+</code> stripped). See <a href="attributes.html#attributes-top">Attributes</a>.</p>
+<a name="syntax-00008"></a><p style="margin-left: 3em;">– A line starting with <code class="inline">/ +*</code> creates a note attached to the current   fragment and a line starting with <code class="inline">:</code> is an attribute of the most recently   created note. See <a href="notes.html#notes-top">Notes</a>.</p>
+<a name="syntax-00009"></a><p style="margin-left: 3em;">– All other lines are fragment text. If a line of fragment text starts with   <code class="inline">&gt;</code>-s, they are stripped and used to set the fragment&#x27;s indentation level. If   a line of fragment text starts with <code class="inline">|</code>, that character is stripped. <code class="inline">|</code> is a   <i>continuation marker</i> used to continue the fragment when it would be otherwise   terminated (<i>e.g.</i>, over blank lines). Unlike the other markers, <code class="inline">&gt;</code> and <code class="inline">|</code>   are recognised only in the very first column of the line.</p>
+<a name="syntax-00010"></a><pre><code style="margin-left: 3em;">This is an example of cardfile syntax.
+The next line sets attribute KEY to the value V0
+/ KEY V0
+Setting an attribute does not break the fragment; our paragraph continues.
+Next, make a card attribute LIST with a list of values:
+// +LIST element0
+// +LIST element1
+
+&gt; This paragraph is indented.
+|
+The indented paragraph continues.</code></pre>
+<a name="syntax-00011"></a><p>A few consequences of these rules are worth spelling out.</p>
+<a name="syntax-00012"></a><p style="margin-left: 3em;">– Attribute lines can appear anywhere: a card attribute can be set in the   middle of a fragment and a deck attribute can be set in any card of any   cardfile. A fragment attribute, however, can only be set while a fragment is   open: after its first line of text or its <code class="inline">;</code> line, and before the empty line   that ends it.</p>
+<a name="syntax-00013"></a><p style="margin-left: 3em;">– Every attribute must have a value: a line consisting of just <code class="inline">/ key</code> is an   error. Values extend to the end of the line, and can contain spaces.</p>
+<a name="syntax-00014"></a><p style="margin-left: 3em;">– Markers are recognised only as separate words. A text line starting with   &quot;/usr/bin&quot; is a text line, because its first word is not <code class="inline">/</code>.</p>
+<a name="syntax-00015"></a><p style="margin-left: 3em;">– Leading blanks do not protect a line: the line is stripped before its first   word is examined. An indented C++ comment &quot;// increment the counter&quot; in a   code display is read as a card attribute (setting &quot;increment&quot; to &quot;the   counter&quot;) and disappears from the output. A comment of a single word, like   &quot;// increment&quot;, has no value and makes card fail.</p>
+<a name="syntax-00016"></a><p style="margin-left: 3em;">– To start a line of text with a word that would otherwise be interpreted as   a marker, prefix the line with <code class="inline">|</code>. In code displays that contain lines   starting with <code class="inline">/</code>, <code class="inline">//</code>, <code class="inline">///</code>, <code class="inline">;</code>, <code class="inline">:</code> or <code class="inline">\</code> (after any blanks), lines   starting with <code class="inline">&gt;</code> or <code class="inline">|</code> (in the first column) and empty lines, this is   required, not optional. The simplest rule is to prefix every line of a code   display with <code class="inline">|</code>: this is how the examples in this manual are written. A   literal <code class="inline">|</code> at the beginning of a line is written as <code class="inline">||</code>.</p>
+<a name="syntax-00017"></a><p style="margin-left: 3em;">– Leading blanks are preserved in code and math fragments. In paragraphs,   lines are joined with a space, but their leading blanks are kept, which   matters when writing regular expressions for links and notes (see <a href="links.html#links-top">Links</a>).</p>
+<a name="syntax-00018"></a><p style="margin-left: 3em;">– There are no comments as such, but attributes not used by card can serve as   comments (see <a href="attributes.html#attributes-attrs">Attributes</a>).</p><footer><a href="start.html#start">&lt;</a>&nbsp;<a href="series_trunk.html">trunk</a>&nbsp;<a href="fragments.html#fragments">&gt;</a>&nbsp;&nbsp;&nbsp;&lt;&nbsp;<a href="series_reference.html">reference</a>&nbsp;<a href="fragments.html#fragments">&gt;</a>&nbsp;&nbsp;&nbsp;</footer></div><p>&nbsp;</p><div class="column"><header>Getting started</header>
+<a name="start-top"></a><p>card is a single Python script. Its only dependency outside of the standard library is the <a href="https://typeguard.readthedocs.io/">typeguard</a> package, which checks type annotations at run-time. Its current release needs Python 3.9 or later:</p>
+<a name="start-00001"></a><pre><code>$ pip install typeguard
+$ git clone https://github.com/nikitadanilov/card
+$ cd card</code></pre>
+<a name="start-00002"></a><p>card is invoked with a list of cardfiles. All files are read in the order given and together form a single deck:</p>
+<a name="start-00003"></a><pre><code>$ ./card [-v] FILE...</code></pre>
+<a name="start-00004"></a><p>The only option, <code class="inline">-v</code> (or <code class="inline">--verbose</code>), prints the internal representation of the deck after the output has been generated (see <a href="debug.html#debug-top">Debugging and caveats</a>).</p>
+<a name="start-00005"></a><p>Let us write a first deck. Put the following into a file called hello.deck:</p>
+<a name="start-00006"></a><pre><code>/// dir out
+// name Hello
+// id hello
+Hello, world! This is a _very_ short deck.
+/ += . &quot;world&quot; -&gt; https://en.wikipedia.org/wiki/Earth
+
+; code
+print(&quot;Hello, world!&quot;)</code></pre>
+<a name="start-00007"></a><p>and run</p>
+<a name="start-00008"></a><pre><code>$ ./card hello.deck</code></pre>
+<a name="start-00009"></a><p>The first line is a deck attribute, telling card to put the output into the &quot;out&quot; directory (the default is &quot;html_out&quot;). The next two lines are attributes of the (only) card: its title and its identifier. Then comes a paragraph with a link attached to the word &quot;world&quot;, followed by a code display. The output directory now contains hello.html with the rendered card, the style sheet style.css and the RSS feed feed.xml (see <a href="html.html#html-top">HTML output</a>).</p>
+<a name="start-00010"></a><p>Note that &quot;_very_&quot; was not italicised: conventions such as underscores for italics are not built in; they have to be defined as styles (see <a href="styles.html#styles-top">Styles</a>). The usual way to do this is to keep the deck-wide definitions (styles, CSS, automatic links) in a separate configuration cardfile that is given to card before the content. This manual is built by</p>
+<a name="start-00011"></a><pre><code>$ ./card self.conf self.deck</code></pre>
+<a name="start-00012"></a><p>where <a href="https://github.com/nikitadanilov/card/blob/master/self.conf">self.conf</a> contains the style definitions and <a href="https://github.com/nikitadanilov/card/blob/master/self.deck">self.deck</a> contains the text. Have a look at both files: they are the most complete example of card usage.</p>
+<a name="start-00013"></a><p>If the deck is going to be published, also set the <code class="inline">deck.url</code> deck attribute to the URL of the output directory. Every page refers to the RSS feed as deck.url/feed.xml, and without the attribute this reference is broken.</p><footer><a href="index.html#index">&lt;</a>&nbsp;<a href="series_trunk.html">trunk</a>&nbsp;<a href="syntax.html#syntax">&gt;</a>&nbsp;&nbsp;&nbsp;</footer></div><p>&nbsp;</p><div class="column"><header>Overview</header>
+<a name="index-top"></a><p>This is the user manual for the <a href="https://github.com/nikitadanilov/card">card</a> tool.</p>
+<a name="index-00001"></a><p>card is similar to other &quot;publishing&quot; tools that take as the input content marked up with formatting instructions and render it in one or more output formats. It is much simpler than <a href="https://gohugo.io/">hugo</a> or <a href="https://pandoc.org/">pandoc</a> and its intended scope is more of a component in a note-taking system than a full-blown site publishing engine.</p>
+<a name="index-00002"></a><p>The input is a &quot;deck&quot;, which is a set of &quot;cards&quot;, each consisting of &quot;fragments&quot;. Fragments correspond to paragraphs and things like code and math displays in the output. Cards are used to organise content into &quot;series&quot;; they can correspond to pages in the output, but not necessarily.</p>
+<a name="index-00003"></a><p>Decks, cards and fragments all have attributes. Attributes are the only mechanism by which formatting is specified: there is no inline markup language built into card. Even the conventional <i>italics</i> and <em>emphasis</em> in this manual are produced by regular expressions defined as attributes of the deck.</p>
+<a name="index-00004"></a><p>Markup instructions are not embedded in the text. For example, the link to Hugo&#x27;s website above is created by</p>
+<a name="index-00005"></a><pre><code>/ += . &quot;hugo&quot; -&gt; https://gohugo.io/</code></pre>
+<a name="index-00006"></a><p>This attaches the hyperlink to the part of the preceding paragraph matching the regular expression &quot;hugo&quot;. The separation between the text and the markup makes (in my personal opinion, that is) the content source more readable.</p>
+<a name="index-00007"></a><p>The documentation is, naturally, maintained via card <a href="https://github.com/nikitadanilov/card/blob/master/self.deck">here</a>. This is how the beginning of this card looks in <a href="https://github.com/nikitadanilov/card/blob/master/self.deck">the source</a> (this is not a Quine preceded by its own quotation):</p>
+<a name="index-00008"></a><pre><code>// C card self-documentation deck: the card user manual.
+// name Overview
+// id index
+// brief What card is, the main concepts and the table of contents.
+// +# trunk 00
+// +tags concepts
+/// deck.title card user manual
+/// deck.description The user manual for the card publishing tool.
+This is the user manual for the card tool.
+/ id top
+/ += . &quot;card&quot; -&gt; https://github.com/nikitadanilov/card</code></pre>
+<a name="index-00009"></a><p>The manual consists of the following cards. They form the &quot;trunk&quot; series, so you can also read them in order by following the arrows at the bottom of each card.</p>
+<a name="index-00010"></a><p style="margin-left: 3em;">– <a href="start.html#start-top">Getting started</a>: installation, running card and a first deck.</p>
+<a name="index-00011"></a><p style="margin-left: 3em;">– <a href="syntax.html#syntax-top">Syntax</a>: the line-oriented format of cardfiles.</p>
+<a name="index-00012"></a><p style="margin-left: 3em;">– <a href="fragments.html#fragments-top">Fragments</a>: paragraphs, code, math, headings and images.</p>
+<a name="index-00013"></a><p style="margin-left: 3em;">– <a href="attributes.html#attributes-top">Attributes</a>: how attributes work, and a reference of attributes understood by card.</p>
+<a name="index-00014"></a><p style="margin-left: 3em;">– <a href="ids.html#ids-top">Identifiers</a>: how nodes are named and how to refer to them.</p>
+<a name="index-00015"></a><p style="margin-left: 3em;">– <a href="links.html#links-top">Links</a>: hyperlinks between the deck and the outside world and within the deck.</p>
+<a name="index-00016"></a><p style="margin-left: 3em;">– <a href="notes.html#notes-top">Notes</a>: marginal notes attached to a part of the text.</p>
+<a name="index-00017"></a><p style="margin-left: 3em;">– <a href="styles.html#styles-top">Styles</a>: italics, emphasis, code and friends, defined by regular expressions.</p>
+<a name="index-00018"></a><p style="margin-left: 3em;">– <a href="series.html#series-top">Series and tags</a>: organising cards: series, navigation, indices and the RSS feed.</p>
+<a name="index-00019"></a><p style="margin-left: 3em;">– <a href="math.html#math-top">Mathematics</a>: inline and display formulae.</p>
+<a name="index-00020"></a><p style="margin-left: 3em;">– <a href="html.html#html-top">HTML output</a>: the files produced and how to customise them.</p>
+<a name="index-00021"></a><p style="margin-left: 3em;">– <a href="phases.html#phases-top">Processing phases</a>: what happens inside card between the input and the output.</p>
+<a name="index-00022"></a><p style="margin-left: 3em;">– <a href="debug.html#debug-top">Debugging and caveats</a>: what to do when things go wrong, and known limitations.</p><footer>&lt;&nbsp;<a href="series_trunk.html">trunk</a>&nbsp;<a href="start.html#start">&gt;</a>&nbsp;&nbsp;&nbsp;</footer></div><p>&nbsp;</p> </body>
+</html>

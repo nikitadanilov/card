@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+ <head>
+   <meta name="viewport"
+         content="width=device-width,
+                  initial-scale=1">
+   <meta charset="UTF-8">
+   <title> Mathematics</title>
+   <link rel="stylesheet" href="style.css">
+   <link rel="alternate"
+         type="application/rss+xml"
+         title="card user manual"
+         href="None/feed.xml">
+   <style></style>
+   
+   
+        <script>window.MathJax = {
+                loader: {load     : ['[tex]/amscd']},
+                tex:    {packages : {'[+]': ['amscd']}}
+        };
+        </script>
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+ </head>
+ <body>
+   <a name="math"></a>\( \def\Bag{\operatorname{Bag}} \)
+\( \def\foo{\operatorname{foo}} \)
+<div class="column"><header>Mathematics</header>
+<a name="math-top"></a><p>card relies on <a href="https://www.mathjax.org/">MathJax</a> for mathematics. A card that contains mathematics loads <a href="https://www.mathjax.org/">MathJax</a> automatically.</p>
+<a name="math-00001"></a><p>Display formulae are written in <code class="inline">math</code> fragments, in TeX notation:</p>
+<a name="math-00002"></a><pre><code>; math
+\Bag(x) = e^x = 1 + x + \frac{x^2}{2!} + \frac{x^3}{3!} + \cdots + \frac{x^n}{n!} + \cdots</code></pre>
+<a name="math-00003"></a><p>which gives</p>
+<a name="math-00004"></a>$$\Bag(x) = e^x = 1 + x + \frac{x^2}{2!} + \frac{x^3}{3!} + \cdots + \frac{x^n}{n!} + \cdots$$
+<a name="math-00005"></a><p>Inline formulae, like \(e^{i\pi} + 1 = 0\) or \(\foo(x)\), are written in a paragraph using the usual TeX inline delimiters, a backslash followed by an opening parenthesis and a backslash followed by a closing parenthesis. For card to notice them, there must be an <code class="inline">ma</code> style matching them (see <a href="styles.html#styles-top">Styles</a>). This manual uses</p>
+<a name="math-00006"></a><pre><code>/// +ma \\\((?P&lt;open&gt;)[^\\]*(?P&lt;close&gt;)\\\)</code></pre>
+<a name="math-00007"></a><p>Note that this expression does not allow backslashes inside an inline formula. This does not matter as long as the card has some other formula that the expression does match: MathJax, once loaded, typesets all formulae in the page.</p>
+<a name="math-00008"></a><p>Styles are applied inside inline formulae as well, and <code class="inline">ma</code> is applied after the other styles. With the manual&#x27;s definitions, the minus signs in the following formula are taken for underline markers and removed:</p>
+<a name="math-00009"></a><pre><code>\(a - b - c\)</code></pre>
+<a name="math-00010"></a><p>Avoid characters used as style markers in inline formulae, or put such formulae in <code class="inline">math</code> fragments.</p>
+<a name="math-00011"></a><p>Macros are defined with the <code class="inline">TeX</code> attribute. Its values are emitted at the top of a card containing mathematics. The attribute is inherited, so macros needed throughout the deck can be defined as deck attributes, while macros specific to a card are defined on the card:</p>
+<a name="math-00012"></a><pre><code>/// +TeX \( \def\foo{\operatorname{foo}} \)
+// +TeX \( \def\Bag{\operatorname{Bag}} \)</code></pre><footer><a href="series.html#series">&lt;</a>&nbsp;<a href="series_trunk.html">trunk</a>&nbsp;<a href="html.html#html">&gt;</a>&nbsp;&nbsp;&nbsp;</footer></div>
+ </body>
+</html>

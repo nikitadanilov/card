@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+ <head>
+   <meta name="viewport"
+         content="width=device-width,
+                  initial-scale=1">
+   <meta charset="UTF-8">
+   <title> Getting started</title>
+   <link rel="stylesheet" href="style.css">
+   <link rel="alternate"
+         type="application/rss+xml"
+         title="card user manual"
+         href="None/feed.xml">
+   <style></style>
+   
+   
+ </head>
+ <body>
+   <a name="start"></a><div class="column"><header>Getting started</header>
+<a name="start-top"></a><p>card is a single Python script. Its only dependency outside of the standard library is the <a href="https://typeguard.readthedocs.io/">typeguard</a> package, which checks type annotations at run-time. Its current release needs Python 3.9 or later:</p>
+<a name="start-00001"></a><pre><code>$ pip install typeguard
+$ git clone https://github.com/nikitadanilov/card
+$ cd card</code></pre>
+<a name="start-00002"></a><p>card is invoked with a list of cardfiles. All files are read in the order given and together form a single deck:</p>
+<a name="start-00003"></a><pre><code>$ ./card [-v] FILE...</code></pre>
+<a name="start-00004"></a><p>The only option, <code class="inline">-v</code> (or <code class="inline">--verbose</code>), prints the internal representation of the deck after the output has been generated (see <a href="debug.html#debug-top">Debugging and caveats</a>).</p>
+<a name="start-00005"></a><p>Let us write a first deck. Put the following into a file called hello.deck:</p>
+<a name="start-00006"></a><pre><code>/// dir out
+// name Hello
+// id hello
+Hello, world! This is a _very_ short deck.
+/ += . &quot;world&quot; -&gt; https://en.wikipedia.org/wiki/Earth
+
+; code
+print(&quot;Hello, world!&quot;)</code></pre>
+<a name="start-00007"></a><p>and run</p>
+<a name="start-00008"></a><pre><code>$ ./card hello.deck</code></pre>
+<a name="start-00009"></a><p>The first line is a deck attribute, telling card to put the output into the &quot;out&quot; directory (the default is &quot;html_out&quot;). The next two lines are attributes of the (only) card: its title and its identifier. Then comes a paragraph with a link attached to the word &quot;world&quot;, followed by a code display. The output directory now contains hello.html with the rendered card, the style sheet style.css and the RSS feed feed.xml (see <a href="html.html#html-top">HTML output</a>).</p>
+<a name="start-00010"></a><p>Note that &quot;_very_&quot; was not italicised: conventions such as underscores for italics are not built in; they have to be defined as styles (see <a href="styles.html#styles-top">Styles</a>). The usual way to do this is to keep the deck-wide definitions (styles, CSS, automatic links) in a separate configuration cardfile that is given to card before the content. This manual is built by</p>
+<a name="start-00011"></a><pre><code>$ ./card self.conf self.deck</code></pre>
+<a name="start-00012"></a><p>where <a href="https://github.com/nikitadanilov/card/blob/master/self.conf">self.conf</a> contains the style definitions and <a href="https://github.com/nikitadanilov/card/blob/master/self.deck">self.deck</a> contains the text. Have a look at both files: they are the most complete example of card usage.</p>
+<a name="start-00013"></a><p>If the deck is going to be published, also set the <code class="inline">deck.url</code> deck attribute to the URL of the output directory. Every page refers to the RSS feed as deck.url/feed.xml, and without the attribute this reference is broken.</p><footer><a href="index.html#index">&lt;</a>&nbsp;<a href="series_trunk.html">trunk</a>&nbsp;<a href="syntax.html#syntax">&gt;</a>&nbsp;&nbsp;&nbsp;</footer></div>
+ </body>
+</html>

@@ -6,7 +6,7 @@ workflow.
 
 The input is a "deck", which is a set of "cards", each consisting of
 "fragments". Fragments correspond to paragraphs and things like code and math
-displays in the output. Cards are used to ogranise content into "series", they
+displays in the output. Cards are used to organise content into "series"; they
 can correspond to pages in the output, but not necessarily.
 
 Decks, cards and fragments all have attributes.

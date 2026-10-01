@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+ <head>
+   <meta name="viewport"
+         content="width=device-width,
+                  initial-scale=1">
+   <meta charset="UTF-8">
+   <title> Links</title>
+   <link rel="stylesheet" href="style.css">
+   <link rel="alternate"
+         type="application/rss+xml"
+         title="card user manual"
+         href="None/feed.xml">
+   <style></style>
+   
+   
+ </head>
+ <body>
+   <a name="links"></a><div class="column"><header>Links</header>
+<a name="links-top"></a><p>A link connects two <i>places</i>: the source and the target. Links are added by <code class="inline">+=</code> attributes. A link attribute value has the following grammar:</p>
+<a name="links-00001"></a><pre><code style="margin-left: 3em;">LINK           ::= SOURCE &#x27;-&gt;&#x27; TARGET
+SOURCE, TARGET ::= URL | DECK_LOCATION
+DECK_LOCATION  ::= NODE [SPAN]
+NODE           ::= &#x27;.&#x27; | &#x27;!&#x27; IDENTIFIER
+SPAN           ::= &#x27;&quot;&#x27; REGEX &#x27;&quot;&#x27;</code></pre>
+<a name="links-00002"></a><p><code class="inline">.</code> refers to the current node: the fragment to which the attribute is attached. <code class="inline">! IDENTIFIER</code> refers to the node with the given identifier (see <a href="ids.html#ids-top">Identifiers</a>). A span is a regular expression (in <a href="https://docs.python.org/3/library/re.html">Python syntax</a>) that selects a part of the text of the node. Anything that does not start with <code class="inline">.</code> or <code class="inline">!</code> is a URL. Examples:</p>
+<a name="links-00003"></a><pre><code style="margin-left: 3em;">\
+// id CARD0
+
+Add a link to a web-page here ...
+/ id PARA0
+/ += . &quot;here&quot; -&gt; https://www.example.com
+
+Another paragraph. Link _to_ it from a particular text in the previous paragraph.
+/ += !CARD0-PARA0 &quot;a link&quot; -&gt; . &quot;Link&quot;</code></pre><p class="margin-left"><span class="annotation" data-uid="1">[<a href="https://www.example.com"><span style="color: blue">0</span></a>]</span>&nbsp;</p>
+<a name="links-00004"></a><p>When a span is the source of a link (<i>i.e.</i>, when it is on the left-hand side of <code class="inline">-&gt;</code>), the HTML engine turns the matched text into a hyperlink, like <a href="https://www.example.com">here</a>. When a span is the target of a link, the matched text <span class="linktarget" data-uid="1">is underlined</span> and a numbered marginal mark linking back to the source is inserted on the left. If the target is a node without a span, the hyperlink leads to the node&#x27;s anchor.</p>
+<a name="links-00005"></a><p>The regular expression is matched against the text of the fragment as it is written in the cardfile, before styles are applied, so the source markup characters (like underscores and asterisks) are visible to it. Every match of the expression gets the link, so make the expression specific enough. Use lookaheads and lookbehinds to select a word in a particular context, as in the &quot;EVCOMB(?=:)&quot; example on the <a href="syntax.html#syntax-top">Syntax</a> card. Remember that the lines of a paragraph are joined with a space, but leading blanks are preserved: use <code class="inline">\s+</code> rather than a single space to match words that can be split across lines.</p>
+<a name="links-00006"></a><p>The URL can refer to the named groups of the expression at the other end with Python format syntax. Together with the inheritance of links, this gives <i>automatic links</i>. A link attribute set on a card applies to every fragment of the card, and one set on the deck applies to every fragment of the deck. This manual&#x27;s <a href="https://github.com/nikitadanilov/card/blob/master/self.conf">self.conf</a> contains:</p>
+<a name="links-00007"></a><pre><code>/// += . &quot;(?P&lt;type&gt;str|dict|set|list)\.(?P&lt;func&gt;[a-z.A-Z_0-9]+)\(\)&quot; -&gt; https://docs.python.org/3/library/stdtypes.html#{type}.{func}
+/// += . &quot;\bcard\.(?P&lt;code&gt;[a-z.A-Z_0-9]+)\(\)&quot; -&gt; https://raw.githubusercontent.com/nikitadanilov/card/refs/heads/master/card#:~:text={code}</code></pre>
+<a name="links-00008"></a><p>which is how the mentions of <a href="https://docs.python.org/3/library/stdtypes.html#str.split"><code class="inline">str.split()</code></a> and <a href="https://raw.githubusercontent.com/nikitadanilov/card/refs/heads/master/card#:~:text=compile_deck"><code class="inline">card.compile_deck()</code></a> get their hyperlinks. Because the URL of a link with a span at the other end always goes through Python formatting, literal braces in such a URL must be doubled: write &quot;{{&quot; and &quot;}}&quot; for &quot;{&quot; and &quot;}&quot;. Otherwise card fails with a KeyError (or IndexError, or ValueError).</p>
+<a name="links-00009"></a><p>The link attribute does not have to be attached to either end of the link. For example, the following attribute, attached to some fragment, links a word in the fragment with identifier &quot;phases-syntax&quot; to a word in the attached fragment:</p>
+<a name="links-00010"></a><pre><code>/ += !phases-syntax &quot;sentences&quot; -&gt; . &quot;marginalia&quot;</code></pre>
+<a name="links-00011"></a><p>This works on a fragment, but not on a card or the deck. A link set on a card or the deck is created anew for every fragment below it. That is what makes automatic links with <code class="inline">.</code> work, but a link with an explicit &quot;!&quot; end set on a card produces as many copies of the same link as the card has fragments. Put such links on a fragment.</p>
+<a name="links-00012"></a><p>Note that the source end of a link (the regular expression or the URL) cannot contain &quot;-&gt;&quot;, and identifiers cannot contain spaces.</p><footer><a href="ids.html#ids">&lt;</a>&nbsp;<a href="series_trunk.html">trunk</a>&nbsp;<a href="notes.html#notes">&gt;</a>&nbsp;&nbsp;&nbsp;<a href="attributes.html#attributes">&lt;</a>&nbsp;<a href="series_reference.html">reference</a>&nbsp;<a href="notes.html#notes">&gt;</a>&nbsp;&nbsp;&nbsp;</footer></div>
+ </body>
+</html>

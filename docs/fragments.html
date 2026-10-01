@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+ <head>
+   <meta name="viewport"
+         content="width=device-width,
+                  initial-scale=1">
+   <meta charset="UTF-8">
+   <title> Fragments</title>
+   <link rel="stylesheet" href="style.css">
+   <link rel="alternate"
+         type="application/rss+xml"
+         title="card user manual"
+         href="None/feed.xml">
+   <style></style>
+   
+   
+ </head>
+ <body>
+   <a name="fragments"></a><div class="column"><header>Fragments</header>
+<a name="fragments-top"></a><p>A fragment is the unit of content within a card. The type of a fragment is given by the <code class="inline">;</code> line preceding it. The following types are supported.</p>
+<a name="fragments-00001"></a><p style="margin-left: 3em;"><code class="inline">para</code>: a text paragraph. This is the default type. The lines of a paragraph   are joined into one line and the result is subject to styles, links and   notes.</p>
+<a name="fragments-00002"></a><p style="margin-left: 3em;"><code class="inline">code</code>: a display of preformatted text. Lines are kept exactly as written   (modulo the leading <code class="inline">|</code> and <code class="inline">&gt;</code>-s). Links and notes are applied to code   displays, but styles are not.</p>
+<a name="fragments-00003"></a><p style="margin-left: 3em;"><code class="inline">math</code>: a display formula in TeX notation. See <a href="math.html#math-top">Mathematics</a>.</p>
+<a name="fragments-00004"></a><p style="margin-left: 3em;"><code class="inline">head</code>: a heading. The <code class="inline">level</code> attribute sets the heading level (1 by   default):</p>
+<a name="fragments-00005"></a><pre><code style="margin-left: 6em;">; head
+/ level 2
+Inner workings</code></pre>
+<a name="fragments-00006"></a><p style="margin-left: 3em;"><code class="inline">img</code>: an image. The image is given by the <code class="inline">url</code> attribute, and its width by   the <code class="inline">width</code> attribute (&quot;50%&quot; by default). The width is written into the   width attribute of the HTML img element, so use a number of pixels or a   percentage, not an arbitrary CSS length. The text of the fragment, if any,   is rendered right after the image, in the same centred line, so it ends up   beside the image if there is room and below it otherwise:</p>
+<a name="fragments-00007"></a><pre><code style="margin-left: 6em;">; img
+/ url https://upload.wikimedia.org/wikipedia/commons/4/47/PNG_transparency_demonstration_1.png
+/ width 30%
+Two dice.</code></pre>
+<a name="fragments-00008"></a><p>Paragraphs, code displays and images can be indented. The number of <code class="inline">&gt;</code> characters at the beginning of a line of text sets the indentation level of the whole fragment. Each level is 3em in the HTML output. The indentation of headings and display formulae is silently ignored. Indentation is used in this manual for lists: card has no special list syntax; a list is just a sequence of indented paragraphs that start with a dash. If several lines of a fragment start with <code class="inline">&gt;</code>, the last one wins. Code displays can be indented in the same way: put the <code class="inline">&gt;</code>-s on the first line of the code, as in the examples above.</p><footer><a href="syntax.html#syntax">&lt;</a>&nbsp;<a href="series_trunk.html">trunk</a>&nbsp;<a href="attributes.html#attributes">&gt;</a>&nbsp;&nbsp;&nbsp;<a href="syntax.html#syntax">&lt;</a>&nbsp;<a href="series_reference.html">reference</a>&nbsp;<a href="attributes.html#attributes">&gt;</a>&nbsp;&nbsp;&nbsp;</footer></div>
+ </body>
+</html>
