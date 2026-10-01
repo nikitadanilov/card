@@ -529,7 +529,6 @@ class TestLinks(CardTest):
         b = self.build('// id c\nGo there.\n/ += . "there" -> !c-t\n\nTarget.\n/ id t\n')
         self.assertIn('<a href="#c-t">there</a>', b.body('c.html'))
 
-    @unittest.expectedFailure # Known bug.
     def test_span_to_whole_card(self):
         b = self.build('// id c\nGo there.\n/ += . "there" -> !d\n\\\n// id d\nTarget.\n')
         self.assertIn('<a href="d.html#d">there</a>', b.body('c.html'))

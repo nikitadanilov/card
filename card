@@ -479,12 +479,6 @@ def attach_styles(n : node) -> None:
                 n.spans.append(stylespan(regex, s))
 
 
-def attach_links(n : node) -> None:
-    for place in n.links:
-        assert place.parent != None
-        n.cadd(cmd(place.parent.base(n) + L_HERE, place.parent))
-
-
 def attach_series_navigation(d : deck, c : card) -> None:
     for (trunk, zahl) in c.get(':#', list, []):
         sequence = list(d.series[trunk])
@@ -527,17 +521,15 @@ def lower_fragment(f : frag) -> List[cmd]:
 
 
 def attach_node_decorations(d : deck) -> None:
-    attach_links(d)
+    # Links are rendered at their spans only. A link to a whole node is
+    # rendered at its source span as a hyperlink to the node's anchor.
     attach_styles(d)
     for c in iter_cards(d):
-        attach_links(c)
         attach_series_navigation(d, c)
         attach_styles(c)
     for f in iter_fragments(d):
-        attach_links(f)
         attach_styles(f)
     for n in iter_notes(d):
-        attach_links(n)
         attach_styles(n)
 
 
