@@ -420,7 +420,6 @@ class TestAttributes(CardTest):
         self.assertIn('<a name="top"></a>', html)
         self.assertIn('<a name="first"></a>', html)
 
-    @unittest.expectedFailure # Known bug.
     def test_brief(self):
         b = self.build('// id c\n// brief Short.\n// +# s 1\nx\n\\\n// id d\n// +# s 2\n' +
                        'Long ' * 40 + '\n')
@@ -722,7 +721,6 @@ SERIES = ('// id c1\n// name One\n// +# s 1\n// +tags t\nFirst.\n\\\n'
           '// id c3\n// name Three\n// +# s 3\nThird.\n')
 
 class TestSeries(CardTest):
-    @unittest.expectedFailure # Known bug.
     def test_navigation(self):
         b = self.build(SERIES)
         self.assertIn('<footer>&lt;&nbsp;<a href="series_s.html">s</a>&nbsp;<a href="c2.html#c2">&gt;</a>',
@@ -731,7 +729,6 @@ class TestSeries(CardTest):
                       '<a href="c3.html#c3">&gt;</a>', b.body('c2.html'))
         self.assertIn('<a href="series_s.html">s</a>&nbsp;&gt;&nbsp;', b.body('c3.html'))
 
-    @unittest.expectedFailure # Known bug.
     def test_index_variants(self):
         b = self.build(SERIES)
         for compact in ['', '_compact']:
@@ -739,7 +736,6 @@ class TestSeries(CardTest):
                 for flat in ['', '_flat']:
                     self.assertTrue(b.exists('series_s{}{}{}.html'.format(compact, reverse, flat)))
 
-    @unittest.expectedFailure # Known bug.
     def test_index_order(self):
         b = self.build(SERIES)
         h = b.html('series_s.html')
@@ -748,20 +744,17 @@ class TestSeries(CardTest):
         h = b.html('series_s_reverse.html')
         self.assertGreater(h.index('>One<'), h.index('>Two<'))
 
-    @unittest.expectedFailure # Known bug.
     def test_flat_index_contains_text(self):
         b = self.build(SERIES)
         h = b.html('series_s_flat.html')
         for t in ['First.', 'Second.', 'Third.']:
             self.assertIn(t, h)
 
-    @unittest.expectedFailure # Known bug.
     def test_positions_compared_as_strings(self):
         b = self.build('// id a\n// +# s 10\nx\n\\\n// id b\n// +# s 9\ny\n')
         h = b.html('series_s.html')
         self.assertLess(h.index('>10<'), h.index('>9<'))
 
-    @unittest.expectedFailure # Known bug.
     def test_default_position(self):
         b = self.build('// id zz\n// +# s\nx\n\\\n// id aa\n// +# s\ny\n')
         h = b.html('series_s.html')
@@ -773,18 +766,15 @@ class TestSeries(CardTest):
     def test_twice_in_series_fails(self):
         self.fails('// id a\n// +# s 1\n// +# s 2\nx\n')
 
-    @unittest.expectedFailure # Known bug.
     def test_several_series(self):
         b = self.build('// id a\n// +# s 1\n// +# r 1\nx\n')
         self.assertIn('series_s.html', b.body('a.html'))
         self.assertIn('series_r.html', b.body('a.html'))
 
-    @unittest.expectedFailure # Known bug.
     def test_series_style(self):
         b = self.build('/// html.series_compact +\n/// html.series_reverse +\n' + SERIES)
         self.assertIn('href="series_s_compact_reverse.html"', b.body('c1.html'))
 
-    @unittest.expectedFailure # Known bug.
     def test_tags(self):
         b = self.build(SERIES)
         h = b.html('tags_t.html')
@@ -796,7 +786,6 @@ class TestSeries(CardTest):
     def test_tags_on_fragments_fail(self):
         self.fails('// id c\nx\n/ +tags t\n')
 
-    @unittest.expectedFailure # Known bug.
     def test_feed(self):
         b = self.build('// id a\n// name A\n// +# timeline 2025-04-01 12:30\nx\n\\\n'
                        '// id b\n// +# timeline 2025-05-01\ny\n\\\n// id c\nz\n')
@@ -851,7 +840,6 @@ class TestOutput(CardTest):
         b = self.build('/// dir a/b\n/// deck.url https://example.com\n// id c\nx\n', conf = None)
         self.assertTrue(os.path.exists(os.path.join(b.tmp, 'a', 'b', 'c.html')))
 
-    @unittest.expectedFailure # Known bug.
     def test_files(self):
         b = self.build(SERIES)
         for f in ['c1.html', 'c2.html', 'c3.html', 'style.css', 'feed.xml',
