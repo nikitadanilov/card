@@ -5,13 +5,14 @@ Run from the top directory of the repository:
 
     python3 -m unittest discover -s tests
 
-Every successful build is checked by htmlcheck: all generated HTML files must
-be well-formed, and all internal hyperlinks must lead to existing files and
-anchors. feed.xml must be well-formed XML.
+Every successful build is checked by card.check_html_dir(): all generated
+HTML files must be well-formed, and all internal hyperlinks must lead to
+existing files and anchors. feed.xml must be well-formed XML.
 
 """
 
 import contextlib
+import http.server
 import importlib.machinery
 import importlib.util
 import io
@@ -22,15 +23,13 @@ import signal
 import subprocess
 import sys
 import tempfile
+import threading
 import unittest
 import xml.etree.ElementTree as ET
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 CARD = os.path.join(ROOT, 'card')
-
-sys.path.insert(0, HERE)
-import htmlcheck
 
 def load_card():
     loader = importlib.machinery.SourceFileLoader('cardtool', CARD)
@@ -134,7 +133,7 @@ class CardTest(unittest.TestCase):
         return b
 
     def validate(self, b):
-        self.assertEqual(htmlcheck.check_dir(b.out), [])
+        self.assertEqual(cardtool.check_html_dir(b.out), [])
         if b.exists('feed.xml'):
             ET.parse(b.path('feed.xml'))
 
@@ -903,7 +902,226 @@ class TestCommandLine(CardTest):
         p = subprocess.run([sys.executable, CARD, 'self.conf', 'self.deck'], cwd = tmp,
                            capture_output = True, text = True, timeout = 120)
         self.assertEqual(p.returncode, 0, p.stderr)
-        self.assertEqual(htmlcheck.check_dir(os.path.join(tmp, 'docs')), [])
+        self.assertEqual(cardtool.check_html_dir(os.path.join(tmp, 'docs')), [])
+
+# ----------------------------------------------------------------------
+# Consistency checks
+# ----------------------------------------------------------------------
+
+class Handler(http.server.BaseHTTPRequestHandler):
+    def do_HEAD(self):
+        code = { '/ok' : 200, '/gone' : 404, '/busy' : 503, '/nohead' : 200 }.get(self.path, 404)
+        if self.path == '/nohead' and self.command == 'HEAD':
+            code = 405
+        self.send_response(code)
+        self.end_headers()
+    def do_GET(self):
+        self.do_HEAD()
+    def log_message(self, *args):
+        pass
+
+class TestCheck(CardTest):
+    @classmethod
+    def setUpClass(cls):
+        cls.server = http.server.ThreadingHTTPServer(('127.0.0.1', 0), Handler)
+        cls.url = 'http://127.0.0.1:{}'.format(cls.server.server_address[1])
+        threading.Thread(target = cls.server.serve_forever, daemon = True).start()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.server.shutdown()
+        cls.server.server_close()
+
+    def check(self, *sources, offline = True, tex = None, files = None):
+        """Runs check_deck() on the sources. Returns the list of problems as
+        (file, line, kind, message)."""
+        tmp = tempfile.mkdtemp(prefix = 'card-test-')
+        self.addCleanup(shutil.rmtree, tmp, True)
+        names = ['{}.deck'.format(chr(ord('a') + i)) for i in range(len(sources))]
+        for (name, src) in zip(names, sources):
+            with open(os.path.join(tmp, name), 'w', encoding = 'utf-8') as fd:
+                fd.write(src)
+        for (name, content) in (files or {}).items():
+            path = os.path.join(tmp, name)
+            os.makedirs(os.path.dirname(path), exist_ok = True)
+            with open(path, 'w') as fd:
+                fd.write(content)
+        cwd = os.getcwd()
+        os.chdir(tmp)
+        try:
+            with contextlib.redirect_stdout(io.StringIO()):
+                p = cardtool.check_deck(names, offline = offline, tex = tex)
+        finally:
+            os.chdir(cwd)
+        return [(w[0] if w else None, w[1] if w else None, k, m) for (w, k, m) in p.list]
+
+    def assertProblem(self, problems, line, kind, text):
+        for (f, l, k, m) in problems:
+            if l == line and k == kind and text in m:
+                return
+        self.fail('no {} "{}" at line {} in {}'.format(kind, text, line, problems))
+
+    def test_clean(self):
+        self.assertEqual(self.check('/// dir out\n// id c\n// +# s 01\nSee here.\n'
+                                    '/ += . "here" -> !c-t "Target"\n/ +* "See" A note.\n\n'
+                                    'Target.\n/ id t\n'), [])
+
+    def test_syntax_error_location(self):
+        self.assertEqual(self.check('// id c\nx\n\n/ k v\n'),
+                         [('a.deck', 4, 'error', 'fragment attribute outside of a fragment.')])
+        self.assertProblem(self.check('// id c\n; tabel\nx\n'), 2, 'error', 'unknown fragment type')
+        self.assertProblem(self.check('// id c\nx\n/ id\n'), 3, 'error', 'attribute without a value')
+        self.assertProblem(self.check('// id c\nx\n: id n\n'), 3, 'error', 'note attribute')
+        self.assertProblem(self.check('// id c\nx\n/ +* x Note.\n'), 3, 'error', 'quoted')
+
+    def test_build_error_location(self):
+        with self.assertRaises(cardtool.CardError) as e:
+            self.build('// id c\nx\n\n/ k v\n')
+        self.assertEqual(str(e.exception), 'a.deck:4: fragment attribute outside of a fragment.')
+
+    def test_unknown_identifier(self):
+        self.assertProblem(self.check('// id c\nx\n/ += . "x" -> !nope\n'), 3, 'error',
+                           'unknown identifier "nope"')
+
+    def test_duplicate_identifier(self):
+        self.assertProblem(self.check('// id c\nx\n/ id f\n\ny\n/ id f\n'), 6, 'error',
+                           'duplicate identifier "c-f"')
+
+    def test_duplicate_position(self):
+        self.assertProblem(self.check('// id a\n// +# s 1\nx\n\\\n// id b\n// +# s 1\ny\n'),
+                           6, 'error', 'position "1" in series "s" is already taken by a')
+
+    def test_tags_on_fragment(self):
+        self.assertProblem(self.check('// id c\nx\n/ +tags t\n'), 3, 'error', 'only cards')
+
+    def test_bad_regex(self):
+        self.assertProblem(self.check('// id c\nx\n/ += . "(" -> https://example.com\n'),
+                           3, 'error', 'invalid regular expression "("')
+        self.assertProblem(self.check('/// +it _[^_]*_\n// id c\n_x_\n'), 1, 'error',
+                           'no group(s) named open, close')
+
+    def test_url_braces(self):
+        self.assertProblem(self.check('// id c\nx\n/ += . "x" -> https://example.com/{y}\n'),
+                           3, 'error', 'literal braces must be doubled')
+
+    def test_unmatched_link(self):
+        p = self.check('/// += . "nowhere" -> https://example.com\n// id c\nText.\n'
+                       '/ += . "absent" -> https://example.com\n\nOther.\n/ id o\n'
+                       '/ += !c-00000 "Text" -> . "missing"\n')
+        self.assertProblem(p, 1, 'error', 'regular expression "nowhere" matches nothing')
+        self.assertProblem(p, 4, 'error', 'regular expression "absent" matches nothing')
+        self.assertProblem(p, 8, 'error', 'regular expression "missing" matches nothing')
+        self.assertEqual(len(p), 3)
+
+    def test_unmatched_link_in_other_node(self):
+        p = self.check('// id c\nText.\n/ id t\n\nOther.\n/ += !c-t "absent" -> https://example.com\n')
+        self.assertProblem(p, 6, 'error', 'matches nothing in c-t')
+
+    def test_automatic_link_used_somewhere(self):
+        self.assertEqual(self.check('/// += . "word" -> https://example.com\n'
+                                    '// id c\nNo.\n\\\n// id d\nA word.\n'), [])
+
+    def test_unmatched_note(self):
+        self.assertProblem(self.check('// id c\nText.\n/ +* "absent" A note.\n'), 3, 'error',
+                           'note regular expression "absent" matches nothing')
+
+    def test_list_attribute_without_plus(self):
+        p = self.check('// id c\n// tags foo\nx\n/ html.style color: red;\n')
+        self.assertProblem(p, 2, 'warning', '"tags" is set without "+"')
+        self.assertProblem(p, 4, 'warning', '"html.style" is set without "+"')
+
+    def test_explicit_link_on_card(self):
+        self.assertProblem(self.check('// id c\n// += !c-t "x" -> https://example.com\nx\n/ id t\n'),
+                           2, 'warning', 'instantiated once for every fragment')
+
+    def test_identifier_with_spaces(self):
+        self.assertProblem(self.check('// id my card\nx\n'), 1, 'warning', 'contains spaces')
+
+    def test_same_output_file(self):
+        self.assertProblem(self.check('// id a\n// html.file x.html\nx\n\\\n'
+                                      '// id b\n// html.file x.html\ny\n'),
+                           4, 'warning', 'overwriting card a')
+
+    def test_series_positions(self):
+        p = self.check('// id a\n// +# s 9\nx\n\\\n// id b\n// +# s 10\ny\n')
+        self.assertProblem(p, 2, 'warning', 'pad them with zeroes')
+
+    def test_timeline_positions(self):
+        p = self.check('/// deck.url https://example.com\n// id a\n// +# timeline April\nx\n')
+        self.assertProblem(p, 3, 'warning', 'does not start with a date')
+
+    def test_images(self):
+        p = self.check('/// dir out\n// id c\n; img\n/ url pics/here.png\n\n'
+                       '; img\n/ url pics/missing.png\n', files = { 'out/pics/here.png' : '' })
+        self.assertEqual(len(p), 1)
+        self.assertProblem(p, 7, 'error', '"pics/missing.png" does not exist')
+
+    def test_relative_link(self):
+        p = self.check('/// dir out\n// id c\nOne two.\n/ += . "One" -> other.html\n'
+                       '/ += . "two" -> c.html#c\n')
+        self.assertEqual(len(p), 1)
+        self.assertProblem(p, 4, 'error', '"other.html" does not exist')
+
+    def test_urls(self):
+        u = self.url
+        p = self.check('// id c\na b c d\n/ += . "a" -> {0}/ok\n/ += . "b" -> {0}/gone\n'
+                       '/ += . "c" -> {0}/busy\n/ += . "d" -> {0}/nohead#x\n'.format(u),
+                       offline = False)
+        self.assertProblem(p, 4, 'error', '/gone: HTTP 404')
+        self.assertProblem(p, 5, 'warning', '/busy: HTTP 503')
+        self.assertEqual(len(p), 2)
+
+    def test_url_of_automatic_link(self):
+        p = self.check('/// += . "(?P<n>gone)" -> {}/{{n}}\n// id c\nIt is gone.\n'.format(self.url),
+                       offline = False)
+        self.assertProblem(p, 3, 'error', '/gone: HTTP 404')
+
+    def test_offline(self):
+        self.assertEqual(self.check('// id c\na\n/ += . "a" -> {}/gone\n'.format(self.url)), [])
+
+    def test_image_url(self):
+        p = self.check('// id c\n; img\n/ url {}/gone\n'.format(self.url), offline = False)
+        self.assertProblem(p, 3, 'error', 'HTTP 404')
+
+    def test_formula_structure(self):
+        p = self.check('// id c\n; math\n\\frac{a}{b\n\nInline \\(\\left( x\\) and \\(\\end{x}\\).\n')
+        self.assertProblem(p, 2, 'error', 'unbalanced "{"')
+        self.assertProblem(p, 5, 'error', 'unbalanced \\left and \\right')
+        self.assertProblem(p, 5, 'error', 'unexpected \\end{x}')
+
+    @unittest.skipUnless(shutil.which('pdflatex'), 'pdflatex is not installed')
+    def test_latex(self):
+        p = self.check('/// +TeX \\( \\def\\foo{F} \\)\n// id c\n'
+                       '// +TeX \\( \\newcommand{\\bar}{B} \\)\n'
+                       '; math\n\\foo + \\undefined\n\n'
+                       'Fine \\(\\foo x\\), bad \\(\\frac{a}\\).\n/ +* "Fine" Note \\(\\nope\\).\n\n'
+                       '; math\n\\begin{CD} A @>>> B \\end{CD}\n',
+                       tex = shutil.which('pdflatex'))
+        self.assertProblem(p, 3, 'error', 'TeX definitions')            # \bar exists.
+        self.assertProblem(p, 4, 'error', 'formula "\\foo + \\undefined": Undefined control sequence')
+        self.assertProblem(p, 7, 'error', 'formula "\\frac{a}"')
+        self.assertProblem(p, 8, 'error', 'formula "\\nope": Undefined control sequence')
+        self.assertFalse([x for x in p if '\\foo x' in x[3] or 'CD' in x[3]], p)
+
+    def test_manual(self):
+        p = self.check(open(os.path.join(ROOT, 'self.conf')).read(),
+                       open(os.path.join(ROOT, 'self.deck')).read(),
+                       tex = shutil.which('pdflatex'))
+        self.assertEqual([x for x in p if x[2] == 'error'], [])
+
+    def test_command_line(self):
+        (p, tmp) = self.cli(['--check', '--offline', 'a.deck'], { 'a.deck' : '// id c\nx\n/ +* "y" N.\n' })
+        self.assertEqual(p.returncode, 1)
+        self.assertIn('a.deck:3: error: note regular expression "y" matches nothing.', p.stdout)
+        self.assertIn('1 error(s), 0 warning(s).', p.stdout)
+        (p, tmp) = self.cli(['-c', '--offline', 'a.deck'], { 'a.deck' : '// id c\nx\n' })
+        self.assertEqual(p.returncode, 0, p.stdout)
+        self.assertFalse(os.path.exists(os.path.join(tmp, 'html_out')))
+
+    def test_command_line_error(self):
+        (p, tmp) = self.cli(['a.deck'], { 'a.deck' : '// id c\n/ k v\n' })
+        self.assertEqual(p.returncode, 1)
+        self.assertEqual(p.stderr, 'a.deck:2: fragment attribute outside of a fragment.\n')
 
 if __name__ == '__main__':
     unittest.main()

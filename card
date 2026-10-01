@@ -24,6 +24,14 @@ import collections
 import html
 import re
 import zlib
+import html.parser
+import urllib.parse
+import urllib.request
+import urllib.error
+import tempfile
+import subprocess
+import shutil
+import concurrent.futures
 from typing import List, Dict, Optional, Tuple
 from typeguard import typechecked # Must be installed.
 
@@ -46,6 +54,9 @@ class node:
         self.links = []
         self.spans = []
         self.processed = None
+        # Source location (file, line) of the node and of its attributes.
+        self.where = None
+        self.where_attrs = {}
     def set(self, key : str, value) -> None:
         """Sets the attribute. If attribute name starts with '+', then the value
         is added to the list.
@@ -62,6 +73,16 @@ class node:
         self.attrs[key] = self.attrs.get(key, []) + [value]
         if (self.debug(4)):
             print('added: "{}" to "{}"'.format(key, self.attrs[key]))
+    def located(self, key : str, value, where : Tuple[str, int]) -> None:
+        """Sets the attribute from the input and records its location."""
+        try:
+            self.set(key, value)
+        except TypeError:
+            raise CardError(where, 'attribute "{0}" was set without "+", so "+{0}" cannot add to it.'.format(key[1:]))
+        self.where_attrs.setdefault(key.lstrip('+'), []).append(where)
+    def attr_where(self, key : str, idx : int = -1):
+        w = self.where_attrs.get(key, [])
+        return w[idx] if -len(w) <= idx < len(w) else self.where
     def get(self, key, ttype : type = str, default = None):
         return ttype(self.attrs.get(key)) if self.has(key) else default
     def has(self, key : str) -> bool:
@@ -187,8 +208,9 @@ class head(frag):
 
 @typechecked
 class note(node):
-    def __init__(self, f : frag, s : str):
+    def __init__(self, f : frag, s : str, where = None):
         node.__init__(self, f)
+        self.where = where
         self.lines = []
         self.markers = collections.defaultdict(list)
         self.html_cmds = []
@@ -200,7 +222,8 @@ class note(node):
         self.parse(s)
     def parse(self, s : str) -> None:
         s = s.lstrip()
-        assert s[0] == '"'
+        if s[0] != '"' or s.count('"') < 2:
+            raise CardError(self.where, 'note without a quoted regular expression.')
         parts = s[1:].split('"', 1)
         self.place = span_place(self, self.parent, parts[0], NOTE_BASE)
         self.line_add(parts[1])
@@ -274,6 +297,8 @@ class deck(node):
     def __init__(self):
         node.__init__(self, None)
         self.cards  = []
+        self.all_links = [] # Links instantiated from link attributes.
+        self.urls   = []    # URLs substituted from the matches of spans.
         self.ids    = {}
         self.tags   = collections.defaultdict(list)
         self.series = collections.defaultdict(dict)
@@ -331,51 +356,72 @@ def read_config(d : deck, file : str) -> None:
     fd.close()
 
 
+class CardError(Exception):
+    """An error in the input, reported with its source location."""
+    def __init__(self, where, msg : str):
+        super().__init__(location(where) + msg)
+        self.where = where
+        self.msg   = msg
+
+def location(where) -> str:
+    return '{}:{}: '.format(*where) if where != None else ''
+
 def read_card_file(d : deck, file : str) -> None:
     seq = 0
     fd  = open(file, 'r')
     c   = card.fromfile(d, file, fd, seq)
+    c.where = (file, 1)
     f   = None
     current_note = None
-    for rawline in fd:
+    for (lineno, rawline) in enumerate(fd, 1):
+        where = (file, lineno)
         line = rawline.strip()
         words = line.split(maxsplit = 2)
+        if len(words) > 0 and words[0] in ('///', '//', '/', ':') and len(words) < 3:
+            raise CardError(where, 'attribute without a value.')
         if len(line) == 0:
             c.frag_add(f)
             f = None
             current_note = None
         elif words[0] == '///':          # Deck attribute
-            d.set(words[1], words[2])
+            d.located(words[1], words[2], where)
             current_note = None
         elif words[0] == '//':           # Card attribute
-            c.set(words[1], words[2])
+            c.located(words[1], words[2], where)
             current_note = None
         elif words[0] == '/':            # Fragment attribute / note creation
-            assert f != None
-            if len(words) > 1 and words[1] == '+*':
-                current_note = note(f, words[2])
+            if f == None:
+                raise CardError(where, 'fragment attribute outside of a fragment.')
+            if words[1] == '+*':
+                current_note = note(f, words[2], where)
                 f.note_add(current_note)
             else:
-                f.set(words[1], words[2])
+                f.located(words[1], words[2], where)
                 current_note = None
         elif words[0] == ':':            # Note attribute
-            assert current_note != None
-            current_note.set(words[1], words[2])
+            if current_note == None:
+                raise CardError(where, 'note attribute not following a note.')
+            current_note.located(words[1], words[2], where)
         elif words[0] == ';':            # Fragment type
+            if len(words) < 2 or words[1] not in frag_types:
+                raise CardError(where, 'unknown fragment type, expected one of: {}.'.format(', '.join(frag_types)))
             c.frag_add(f)
             f = frag_types[words[1]](c)
+            f.where = where
             current_note = None
         elif words[0] == '\\':         # New card
             c.frag_add(f)
             d.card_add(c)
             seq = seq + 1
             c = card.fromfile(d, file, fd, seq)
+            c.where = where
             f = None
             current_note = None
         else:
             current_note = None
             if f == None:
                 f = para(c)
+                f.where = where
             if rawline[0] == '|':        # Continuation
                 rawline = rawline[1:]
             else:
@@ -427,25 +473,33 @@ def iter_card_nodes(d : deck):
             yield n
 
 
-def register_series_membership(d : deck, obj : node, spec : str) -> None:
+def register_series_membership(d : deck, obj : node, spec : str, where) -> None:
     words = spec.split(maxsplit = 1)
-    assert len(words) > 0
     trunk = words[0]
     zahl  = words[1] if len(words) > 1 else obj.id()
-    assert zahl not in d.series[trunk]
-    assert trunk not in obj.series_id
+    if not isinstance(obj, card):
+        raise CardError(where, 'only cards can be placed in series.')
+    if zahl in d.series[trunk]:
+        raise CardError(where, 'position "{}" in series "{}" is already taken by {}.'.format(
+            zahl, trunk, d.series[trunk][zahl].id()))
+    if trunk in obj.series_id:
+        raise CardError(where, 'the card is already in series "{}".'.format(trunk))
     d.series[trunk][zahl] = obj
     obj.series_id[trunk] = zahl
     obj.add(':#', (trunk, zahl))
 
 
 def index_node(d : deck, obj : node) -> None:
-    assert obj.id() not in d.ids   # Identifier must be unique.
+    if obj.id() in d.ids:          # Identifier must be unique.
+        raise CardError(obj.attr_where('id'), 'duplicate identifier "{}", also used at {}.'.format(
+            obj.id(), location(d.ids[obj.id()].attr_where('id')).rstrip(': ') or 'another node'))
     d.ids[obj.id()] = obj
+    if obj.has('tags') and not isinstance(obj, card):
+        raise CardError(obj.attr_where('tags'), 'only cards can be tagged.')
     for t in obj.get('tags', list, []):
         d.tags[t] += [obj]
-    for s in obj.get('#', list, []):
-        register_series_membership(d, obj, s)
+    for (i, s) in enumerate(obj.get('#', list, [])):
+        register_series_membership(d, obj, s, obj.attr_where('#', i))
 
 
 def index_nodes(d : deck) -> None:
@@ -461,8 +515,8 @@ def build_node_links(d : deck, n : node) -> None:
         # Links of a fragment are meant for the fragment, not for its notes.
         if isinstance(n, note) and x is n.parent:
             continue
-        for l in x.get('=', list, []):
-            link(d, n, l)
+        for (i, l) in enumerate(x.get('=', list, [])):
+            link(d, n, l, (x, i))
 
 
 def build_links(d : deck) -> None:
@@ -475,8 +529,9 @@ def attach_styles(n : node) -> None:
     # Only apply styles to paras. This should be done more generically.
     if not isinstance(n, frag) or isinstance(n, para):
         for s in stylenames:
-            for regex in n.join(s):
-                n.spans.append(stylespan(regex, s))
+            for x in n.ancestry():
+                for (i, regex) in enumerate(x.get(s, list, [])):
+                    n.spans.append(stylespan(regex, s, x.attr_where(s, i)))
 
 
 def attach_series_navigation(d : deck, c : card) -> None:
@@ -639,9 +694,13 @@ class span:
 
 class respan(span):
     """Span based on a regular expression."""
-    def __init__(self, pattern : str):
+    def __init__(self, pattern : str, where = None):
         self.re    = pattern
-        self.regex = re.compile(pattern)
+        self.where = where
+        try:
+            self.regex = re.compile(pattern)
+        except re.error as e:
+            raise CardError(where, 'invalid regular expression "{}": {}.'.format(pattern, e))
     def find(self, s : str, pos : int):
         return self.regex.search(s, pos)
     def transform(self, s : str, m) -> Tuple[str, int, List[Tuple[int, int]], List[Tuple(int, cmd)], List[Tuple(int, cmd)]]:
@@ -663,6 +722,7 @@ class url_place(place):
         self.url  = url
         self.node = None
         self.parent = parent
+        self.where = None
     def __str__(self) -> str:
         return 'url: ' + self.url
 
@@ -679,7 +739,7 @@ class node_place(place):
 class span_place(place):
     class link_span(respan):
         def __init__(self, place : span_place, re : str):
-            super().__init__(re)
+            super().__init__(re, place.where())
             self.place = place
         def transform(self, s : str, m) -> Tuple[str, int, List[Tuple[int, int]], List[Tuple(int, cmd)], List[Tuple(int, cmd)]]:
             # Adjust the other end, given the match.
@@ -690,23 +750,38 @@ class span_place(place):
                 other = oldlink.src
             if isinstance(other, url_place):
                 # Create new link with replaced target
-                newlink = link(oldlink.obj.deck(), oldlink.obj, ". -> .")
-                copy = url_place(newlink, other.url.format(**m.groupdict()))
+                newlink = link(oldlink.obj.deck(), oldlink.obj, ". -> .", oldlink.origin)
+                try:
+                    url = other.url.format(**m.groupdict())
+                except (KeyError, IndexError, ValueError) as e:
+                    raise CardError(oldlink.where(), 'cannot substitute the groups of "{}" into URL "{}" '
+                                    '(literal braces must be doubled): {}: {}.'.format(
+                                        self.re, other.url, type(e).__name__, e))
+                copy = url_place(newlink, url)
+                # Report problems with the URL at the link attribute if it is set
+                # on the fragment or note itself, otherwise at the fragment.
+                inherited = oldlink.origin == None or oldlink.origin[0] is not oldlink.obj
+                copy.where = oldlink.obj.where if inherited else oldlink.where()
+                oldlink.deck.urls.append(copy)
                 if self.place.base == LSRC_BASE:
                     newlink.tgt = copy
                 else:
                     newlink.src = copy
                 oldlink = newlink
+            self.place.matches += 1
             return (s, m.end(), [],
                     [(m.start(), cmd(self.place.base + L_START, oldlink))],
                     [(m.end(),   cmd(self.place.base + L_END,   oldlink))])
     def __init__(self, parent, obj : node, pattern : str, base : int):
         self.node   = obj
         self.parent = parent
-        self.span   = span_place.link_span(self, pattern)
         self.base   = base
         self.pattern = pattern
+        self.matches = 0
+        self.span   = span_place.link_span(self, pattern)
         self.node.spans.append(self.span)
+    def where(self):
+        return self.parent.where() if isinstance(self.parent, link) else self.parent.where
     def __str__(self) -> str:
         return 'span_place: "' + self.pattern + '"'
     def __repr__(self) -> str:
@@ -714,9 +789,13 @@ class span_place(place):
 
 class cmdspan(respan):
     """Span decorating the extent with particular commands."""
-    def __init__(self, pattern : str, acts : Dict[str, (Optional[str], Optional[cmd], Optional[cmd])]):
-        super().__init__(pattern)
+    def __init__(self, pattern : str, acts : Dict[str, (Optional[str], Optional[cmd], Optional[cmd])], where = None):
+        super().__init__(pattern, where)
         self.acts = acts
+        missing = [a for a in acts if a not in self.regex.groupindex]
+        if missing:
+            raise CardError(where, 'regular expression "{}" has no group(s) named {}.'.format(
+                pattern, ', '.join(missing)))
     def transform(self, s : str, m) -> Tuple[str, int, List[Tuple[int, int]], List[Tuple(int, cmd)], List[Tuple(int, cmd)]]:
         # Sort the matched groups
         groups = sorted([(m.span(aname), aname) for aname in self.acts], key = lambda x: x[0][0])
@@ -746,10 +825,10 @@ class cmdspan(respan):
         return (out, term, deltas, inp, exp)
 
 class stylespan(cmdspan):
-    def __init__(self, pattern : str, style : str):
+    def __init__(self, pattern : str, style : str, where = None):
         styleop = stylenames[style]
         super().__init__(pattern, { 'open'  : ('', cmd(STYLE_BEGIN, styleop), None),
-                                    'close' : ('', None, cmd(STYLE_END, styleop)) })
+                                    'close' : ('', None, cmd(STYLE_END, styleop)) }, where)
 
 @typechecked
 class link:
@@ -769,32 +848,43 @@ class link:
         NODE  ::= '.' | '!' IDENTIFIER
         SPAN  ::= '"' REGEX '"'
     """
-    def __init__(self, d : deck, obj : node, s : str):
+    def __init__(self, d : deck, obj : node, s : str, origin = None):
         self.deck = d
         self.obj = obj
         self.s = s
         self.quoted = False
+        self.origin = origin # (node, index) of the '=' attribute value.
+        if origin != None:
+            d.all_links.append(self)
         self.parse()
+    def where(self):
+        return self.origin[0].attr_where('=', self.origin[1]) if self.origin != None else self.obj.where
     def parse(self) -> None:
         parts = self.s.split('->', 1)
+        if len(parts) != 2:
+            raise CardError(self.where(), 'link "{}" has no "->".'.format(self.s))
         self.src = self.place(parts[0].strip(), LSRC_BASE)
         self.tgt = self.place(parts[1].strip(), LTGT_BASE)
     def place(self, s : str, base : int) -> place:
-        assert len(s) > 0
+        if len(s) == 0:
+            raise CardError(self.where(), 'link "{}" has an empty end.'.format(self.s))
         rest = s[1:].strip()
         if   s[0] == '.':
             obj = self.obj
         elif s[0] == '!':
             parts = rest.split(' ', 1)
+            if parts[0] not in self.deck.ids:
+                raise CardError(self.where(), 'link "{}" refers to unknown identifier "{}".'.format(self.s, parts[0]))
             obj   = self.deck.ids[parts[0]]
             rest  = parts[1] if len(parts) > 1 else ''
         else:
-            return url_place(self, s)
+            p = url_place(self, s)
+            p.where = self.where()
+            return p
         rest = rest.strip()
         if rest != '':
-            assert rest[ 0] == '"'
-            assert rest[-1] == '"'
-            parts = rest[1:].split('"', 1)
+            if len(rest) < 2 or rest[0] != '"' or rest[-1] != '"':
+                raise CardError(self.where(), 'link "{}": expected a quoted regular expression, got {}.'.format(self.s, rest))
             return span_place(self, obj, rest[1:-1], base)
         else:
             return node_place(self, obj)
@@ -1165,7 +1255,8 @@ class html_eng(eng):
     def feed(self) -> None:
         if not self.deck.has('deck.url'):
             if 'timeline' in self.deck.series:
-                raise ValueError('The "timeline" series requires the deck.url deck attribute.')
+                c = list(self.deck.series['timeline'].values())[0]
+                raise CardError(c.attr_where('#'), 'the "timeline" series requires the deck.url deck attribute.')
             return
         self.fd = open('feed.xml', 'w')
         self.out(('<?xml version="1.0" encoding="utf-8"?>\n'        +
@@ -1413,7 +1504,7 @@ class html_eng(eng):
                                                                 'level'   : f.get('level', str, '1') }))
         if isinstance(f, img):
             if not f.has('url'):
-                raise ValueError('Image fragment {} has no url attribute.'.format(f.id()))
+                raise CardError(f.where, 'image fragment without the url attribute.')
             self.outnl(self.html_img.format(**{ 'url' : html.escape(f.get('url')),
                                                 'width' : html.escape(f.get('width', str, '50%')) }))
             if f.content() != '':
@@ -1545,17 +1636,435 @@ def recstring(x) -> str:
     else:
         return x.__str__()
 
+# ----------------------------------------------------------------------
+# Consistency checks
+# ----------------------------------------------------------------------
+
+class html_checker(html.parser.HTMLParser):
+    """Structural checks of the generated HTML.
+
+    This is not a full HTML5 validator. It checks that every element is
+    properly closed and nested, that there are no block elements inside
+    paragraphs, no nested hyperlinks, no duplicate anchors and that the rows of
+    a table have the same number of cells.
+
+    """
+    VOID  = { 'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link',
+              'meta', 'source', 'track', 'wbr' }
+    BLOCK = { 'address', 'article', 'aside', 'blockquote', 'center', 'details',
+              'dialog', 'div', 'dl', 'fieldset', 'figcaption', 'figure', 'footer',
+              'form', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'header', 'hr', 'main',
+              'nav', 'ol', 'p', 'pre', 'section', 'table', 'ul' }
+    def __init__(self, name : str):
+        super().__init__(convert_charrefs = True)
+        self.name    = name
+        self.errors  = []
+        self.stack   = []
+        self.anchors = set()
+        self.hrefs   = []  # (line, url, tag)
+        self.doctype = False
+        self.title   = None
+        self.tables  = []  # Stack of tables, each a list of cell counts of rows.
+    def error(self, msg : str) -> None:
+        self.errors.append('{}:{}: {}'.format(self.name, self.getpos()[0], msg))
+    def handle_decl(self, decl):
+        if decl.lower() == 'doctype html':
+            self.doctype = True
+    def handle_starttag(self, tag, attrs):
+        a = dict(attrs)
+        for (k, v) in attrs:
+            if v != None and 'None' in v.split('/'):
+                self.error('attribute {}="{}" in <{}>'.format(k, v, tag))
+        if tag in self.BLOCK and 'p' in self.stack:
+            self.error('block element <{}> inside <p>'.format(tag))
+        if tag == 'a' and 'a' in self.stack:
+            self.error('nested <a>')
+        for k in ('name', 'id'):
+            if a.get(k, '') != '' and (tag == 'a' or k == 'id'):
+                if a[k] in self.anchors:
+                    self.error('duplicate anchor "{}"'.format(a[k]))
+                self.anchors.add(a[k])
+        for k in ('href', 'src'):
+            if k in a and tag in ('a', 'link', 'img'):
+                self.hrefs.append((self.getpos()[0], a[k], tag))
+        if tag == 'table':
+            self.tables.append([])
+        elif tag == 'tr' and self.tables:
+            self.tables[-1].append(0)
+        elif tag in ('td', 'th') and self.tables and self.tables[-1]:
+            self.tables[-1][-1] += 1
+        if tag not in self.VOID:
+            self.stack.append(tag)
+    def handle_startendtag(self, tag, attrs):
+        self.handle_starttag(tag, attrs)
+        if tag not in self.VOID:
+            self.stack.pop()
+    def handle_endtag(self, tag):
+        if tag in self.VOID:
+            self.error('end tag for void element <{}>'.format(tag))
+        elif not self.stack:
+            self.error('stray </{}>'.format(tag))
+        elif self.stack[-1] != tag:
+            self.error('</{}> closes <{}>'.format(tag, self.stack[-1]))
+            if tag in self.stack:
+                while self.stack.pop() != tag:
+                    pass
+        else:
+            self.stack.pop()
+            if tag == 'table':
+                rows = self.tables.pop()
+                if len(set(rows)) > 1:
+                    self.error('table rows have different numbers of cells: {}'.format(rows))
+    def handle_data(self, data):
+        if self.stack and self.stack[-1] == 'title':
+            self.title = (self.title or '') + data
+    def close(self):
+        super().close()
+        if self.stack:
+            self.error('unclosed elements: {}'.format(self.stack))
+        if not self.doctype:
+            self.error('missing <!DOCTYPE html>')
+        if self.title == None:
+            self.error('missing <title>')
+
+url_scheme = re.compile(r'^[a-zA-Z][a-zA-Z0-9+.-]*:|^//')
+
+def check_html_dir(d : str, images : bool = True) -> List[str]:
+    """Checks all HTML files in directory d and the internal hyperlinks between
+    them. Returns the list of errors."""
+    files  = {}
+    errors = []
+    for name in sorted(os.listdir(d)):
+        if name.endswith('.html'):
+            c = html_checker(name)
+            with open(os.path.join(d, name), encoding = 'utf-8') as fd:
+                c.feed(fd.read())
+            c.close()
+            files[name] = c
+            errors += c.errors
+    for (name, c) in files.items():
+        for (line, href, tag) in c.hrefs:
+            if url_scheme.match(href) or (tag == 'img' and not images):
+                continue
+            (path, _, anchor) = href.partition('#')
+            target = name if path == '' else urllib.parse.unquote(path)
+            where = '{}:{}: '.format(name, line)
+            if not os.path.exists(os.path.join(d, target)):
+                errors.append(where + 'link to a missing file "{}"'.format(href))
+            elif anchor != '' and target in files and \
+                 urllib.parse.unquote(anchor) not in files[target].anchors:
+                errors.append(where + 'link to a missing anchor "{}"'.format(href))
+    return errors
+
+class problems:
+    """Collects the problems found by check_deck()."""
+    def __init__(self):
+        self.list = []
+    def add(self, where, kind : str, msg : str) -> None:
+        if (where, kind, msg) not in self.list:
+            self.list.append((where, kind, msg))
+    def error(self, where, msg : str) -> None:
+        self.add(where, 'error', msg)
+    def warning(self, where, msg : str) -> None:
+        self.add(where, 'warning', msg)
+    def errors(self) -> int:
+        return len([p for p in self.list if p[1] == 'error'])
+    def lines(self) -> List[str]:
+        return ['{}{}: {}'.format(location(w), k, m) for (w, k, m) in self.list]
+
+list_attributes = { 'tags', '#', '=', 'TeX', 'html.style', 'html.head', 'html.title',
+                    'frag.id.show' } | set(stylenames)
+
+def check_url(url : str, timeout : float = 15):
+    """Checks that an external resource exists.
+
+    Returns None, or a pair (kind, message), where kind is 'error' if the
+    resource does not exist and 'warning' if the failure can be transient.
+    """
+    if not re.match(r'^https?://', url):
+        return None
+    headers = { 'User-Agent' : 'Mozilla/5.0 (compatible; card-check)' }
+    err = None
+    for method in ['HEAD', 'GET']:
+        try:
+            req = urllib.request.Request(url, headers = headers, method = method)
+            with urllib.request.urlopen(req, timeout = timeout) as r:
+                return None
+        except urllib.error.HTTPError as e:
+            transient = e.code == 429 or e.code >= 500
+            err = ('warning' if transient else 'error', 'HTTP {} {}'.format(e.code, e.reason))
+            if e.code not in (400, 403, 405, 429, 500, 501):
+                break # Do not retry with GET.
+        except Exception as e:
+            err = ('warning', str(getattr(e, 'reason', e)))
+            break
+    return err
+
+def tex_macros(c : card) -> List[str]:
+    """TeX definitions of a card, without the math delimiters."""
+    out = []
+    for v in c.join('TeX'):
+        v = v.strip()
+        for (o, e) in [('\\(', '\\)'), ('\\[', '\\]'), ('$$', '$$')]:
+            if v.startswith(o) and v.endswith(e) and len(v) >= len(o) + len(e):
+                v = v[len(o) : len(v) - len(e)]
+                break
+        out.append(v)
+    return out
+
+inline_math = re.compile(r'\\\((.*?)\\\)', re.S)
+
+def card_formulae(c : card):
+    """(where, display, text) of the formulae of a card, as typeset by MathJax."""
+    out = []
+    for f in c.frags:
+        if isinstance(f, math):
+            out.append((f.where, True, f.content()))
+        elif isinstance(f, para):
+            for m in inline_math.finditer(f.content()):
+                out.append((f.where, False, m.group(1)))
+        for n in f.notes:
+            for m in inline_math.finditer(n.content()):
+                out.append((n.where, False, m.group(1)))
+    return out
+
+def check_tex_structure(text : str) -> Optional[str]:
+    """Checks braces and environments of a formula without TeX."""
+    depth = 0
+    envs  = []
+    for m in re.finditer(r'\\begin\{([^}]*)\}|\\end\{([^}]*)\}|\\.|[{}]', text):
+        t = m.group(0)
+        if m.group(1) != None:
+            envs.append(m.group(1))
+        elif m.group(2) != None:
+            if not envs or envs.pop() != m.group(2):
+                return 'unexpected \\end{{{}}}'.format(m.group(2))
+        elif t == '{':
+            depth += 1
+        elif t == '}':
+            depth -= 1
+            if depth < 0:
+                return 'unbalanced "}"'
+    if depth > 0:
+        return 'unbalanced "{"'
+    if envs:
+        return 'unclosed \\begin{{{}}}'.format(envs[-1])
+    if len(re.findall(r'\\left\b', text)) != len(re.findall(r'\\right\b', text)):
+        return 'unbalanced \\left and \\right'
+    return None
+
+def check_tex(c : card, formulae, tex : Optional[str], p : problems) -> None:
+    """Checks the formulae of a card by running LaTeX on them."""
+    macros = tex_macros(c)
+    good = []
+    for (where, display, text) in formulae:
+        # Structural errors make TeX lose track of the following formulae.
+        err = check_tex_structure(text)
+        if err != None:
+            p.error(where, 'formula "{}": {}.'.format(text.strip(), err))
+        else:
+            good.append((where, display, text))
+    formulae = good
+    if tex == None or not formulae:
+        return
+    lines  = ['\\documentclass{article}',
+              '\\usepackage{amsmath,amssymb,amscd}',
+              '\\nonstopmode'] + macros + ['\\begin{document}']
+    first  = len(lines) + 1
+    ranges = []
+    for (where, display, text) in formulae:
+        start = len(lines) + 1
+        body  = text.split('\n')
+        lines += ['\\[' if display else '\\('] + body + ['\\]' if display else '\\)', '\\par']
+        ranges.append((start, len(lines), where, text))
+    lines += ['\\end{document}']
+    with tempfile.TemporaryDirectory() as tmp:
+        with open(os.path.join(tmp, 'f.tex'), 'w', encoding = 'utf-8') as fd:
+            fd.write('\n'.join(lines) + '\n')
+        try:
+            subprocess.run([tex, '-interaction=nonstopmode', '-no-shell-escape', '-draftmode', 'f.tex'],
+                           cwd = tmp, stdin = subprocess.DEVNULL, stdout = subprocess.DEVNULL,
+                           stderr = subprocess.DEVNULL, timeout = 120)
+        except subprocess.TimeoutExpired:
+            p.error(c.where, '{} did not finish on the formulae of the card.'.format(tex))
+            return
+        try:
+            with open(os.path.join(tmp, 'f.log'), encoding = 'utf-8', errors = 'replace') as fd:
+                log = fd.read().split('\n')
+        except OSError:
+            p.error(c.where, '{} produced no log.'.format(tex))
+            return
+    reported = set()
+    for (i, l) in enumerate(log):
+        if not l.startswith('! ') or l.startswith('! Emergency stop') or \
+           l.startswith('!  ==> Fatal error'):
+            continue
+        lineno = None
+        for k in log[i + 1 : i + 20]:
+            m = re.match(r'l\.(\d+)', k)
+            if m:
+                lineno = int(m.group(1))
+                break
+        msg = l[2:].rstrip('.')
+        if lineno != None and lineno < first:
+            key = ('macros', msg)
+            if key not in reported:
+                p.error(c.attr_where('TeX'), 'TeX definitions: {}.'.format(msg))
+        else:
+            hit = [r for r in ranges if lineno != None and r[0] <= lineno <= r[1]]
+            (start, end, where, text) = hit[0] if hit else (None, None, c.where, '')
+            key = (start, msg)
+            if key not in reported:
+                p.error(where, 'formula "{}": {}.'.format(text.strip(), msg))
+        reported.add(key)
+
+def check_deck(files : List[str], offline : bool = False,
+               tex : Optional[str] = 'auto') -> problems:
+    """Builds the deck in a temporary directory and checks its consistency."""
+    p = problems()
+    d = deck()
+    try:
+        for f in files:
+            d.cardread(f)
+    except CardError as e:
+        p.error(e.where, e.msg)
+        return p
+    outdir = os.path.abspath(d.get('dir', str, 'html_out'))
+    with tempfile.TemporaryDirectory() as tmp:
+        d.set('dir', tmp)
+        try:
+            d.crossref()
+            d.build()
+        except CardError as e:
+            p.error(e.where, e.msg)
+            return p
+        except Exception as e:
+            p.error(None, 'card failed: {}: {}'.format(type(e).__name__, e))
+            return p
+        for e in check_html_dir(tmp, images = False):
+            # Missing files are reported below with their source locations.
+            if 'link to a missing file' not in e:
+                p.error(None, 'generated HTML: ' + e)
+        generated = set(os.listdir(tmp))
+    # Regular expressions that match nothing.
+    matched = collections.defaultdict(lambda: { 'src' : None, 'tgt' : None })
+    for l in d.all_links:
+        for (end, pl) in [('src', l.src), ('tgt', l.tgt)]:
+            if isinstance(pl, span_place):
+                m = matched[(id(l.origin[0]), l.origin[1])]
+                m[end] = (m[end] or 0) + pl.matches
+                m['link'] = l
+    for m in matched.values():
+        for end in ['src', 'tgt']:
+            if m[end] == 0:
+                l  = m['link']
+                pl = getattr(l, end)
+                p.error(l.where(), 'link "{}": regular expression "{}" matches nothing{}.'.format(
+                    l.s, pl.pattern, '' if pl.node is l.obj else ' in ' + pl.node.id()))
+    for n in iter_notes(d):
+        if n.place.matches == 0:
+            p.error(n.where, 'note regular expression "{}" matches nothing.'.format(n.place.pattern))
+    # Links with explicit nodes set on cards or on the deck.
+    seen = set()
+    for l in d.all_links:
+        (x, i) = l.origin
+        if isinstance(x, (card, deck)) and re.search(r'(^|->)\s*!', l.s) and (id(x), i) not in seen:
+            seen.add((id(x), i))
+            p.warning(l.where(), 'link "{}" with an explicit node is set on a {}, so it is '
+                      'instantiated once for every fragment and note below it.'.format(
+                          l.s, type(x).__name__))
+    # List attributes set without '+'.
+    for n in iter_nodes(d):
+        for key in list_attributes:
+            if n.has(key) and isinstance(n.attrs[key], str):
+                p.warning(n.attr_where(key), 'list attribute "{0}" is set without "+": '
+                          'use "+{0}".'.format(key))
+    # Identifiers.
+    for n in iter_nodes(d):
+        if n.has('id') and re.search(r'\s', n.get('id')):
+            p.warning(n.attr_where('id'), 'identifier "{}" contains spaces and cannot be '
+                      'used in links.'.format(n.get('id')))
+    # Output files.
+    files_of = collections.defaultdict(list)
+    for c in d.cards:
+        files_of[c.get(html_file)].append(c)
+    for (name, cards) in files_of.items():
+        for c in cards[1:]:
+            p.warning(c.where, 'card {} is written to {}, overwriting card {}.'.format(
+                c.id(), name, cards[0].id()))
+    # Series positions.
+    for (trunk, positions) in d.series.items():
+        z = list(positions)
+        if all(x.isdigit() for x in z) and len(set(len(x) for x in z)) > 1:
+            p.warning(positions[z[0]].attr_where('#'), 'positions in series "{}" are numbers of '
+                      'different lengths, but they are compared as strings: pad them with '
+                      'zeroes.'.format(trunk))
+        if trunk == 'timeline':
+            for (zahl, c) in positions.items():
+                if not re.match(r'^\d{4}-\d{2}-\d{2}', zahl):
+                    p.warning(c.attr_where('#'), 'timeline position "{}" does not start with '
+                              'a date YYYY-MM-DD.'.format(zahl))
+    # Local and external resources.
+    urls = collections.defaultdict(list)
+    for u in d.urls:
+        urls[u.url].append(u.where)
+    for f in iter_fragments(d):
+        if isinstance(f, img) and f.has('url'):
+            urls[f.get('url')].append(f.attr_where('url'))
+    external = collections.defaultdict(list) # Page -> URLs on the page.
+    for (url, wheres) in urls.items():
+        if url_scheme.match(url):
+            external[url.partition('#')[0]].append(url)
+            continue
+        path = urllib.parse.unquote(url.partition('#')[0].partition('?')[0])
+        if path != '' and path not in generated and not os.path.exists(os.path.join(outdir, path)):
+            for w in sorted(set(wheres), key = lambda w: (w or ('', 0))):
+                p.error(w, '"{}" does not exist in the output directory {}.'.format(url, outdir))
+    if not offline and external:
+        pages = sorted(external)
+        with concurrent.futures.ThreadPoolExecutor(max_workers = 8) as pool:
+            for (page, err) in zip(pages, pool.map(check_url, pages)):
+                if err != None:
+                    for url in external[page]:
+                        for w in sorted(set(urls[url]), key = lambda w: (w or ('', 0))):
+                            p.add(w, err[0], '{}: {}.'.format(url, err[1]))
+    # Mathematics.
+    if tex == 'auto':
+        tex = shutil.which('pdflatex') or shutil.which('latex')
+        if tex == None and any(card_formulae(c) for c in d.cards):
+            p.warning(None, 'pdflatex not found: only the structure of formulae is checked.')
+    for c in d.cards:
+        formulae = card_formulae(c)
+        if formulae:
+            check_tex(c, formulae, tex, p)
+    return p
+
 def main():
-    parser = argparse.ArgumentParser(description='Card reader.')
-    parser.add_argument('-v', '--verbose', action='store_true', help='Enable verbose mode.')
-    parser.add_argument('files', nargs=argparse.REMAINDER, help='Card files to be processed.')
+    parser = argparse.ArgumentParser(description = 'Render a deck of cards.')
+    parser.add_argument('-v', '--verbose', action = 'store_true',
+                        help = 'print the internal representation of the deck.')
+    parser.add_argument('-c', '--check', action = 'store_true',
+                        help = 'check the deck for consistency instead of rendering it.')
+    parser.add_argument('--offline', action = 'store_true',
+                        help = 'with --check, do not check external URLs.')
+    parser.add_argument('files', nargs = '+', metavar = 'FILE', help = 'cardfiles to process.')
     args = parser.parse_args()
 
+    if args.check:
+        p = check_deck(args.files, offline = args.offline)
+        for l in p.lines():
+            print(l)
+        print('{} error(s), {} warning(s).'.format(p.errors(), len(p.list) - p.errors()))
+        sys.exit(1 if p.errors() > 0 else 0)
     rolodex = deck()
-    for file in args.files:
-        rolodex.cardread(file)
-    rolodex.crossref()
-    rolodex.build()
+    try:
+        for file in args.files:
+            rolodex.cardread(file)
+        rolodex.crossref()
+        rolodex.build()
+    except CardError as e:
+        print(e, file = sys.stderr)
+        sys.exit(1)
     if args.verbose:
         print(rolodex)
         

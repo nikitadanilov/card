@@ -121,10 +121,12 @@ card is invoked with a list of cardfiles. All files are read in the order given
 and together form a single deck:
 
 ; code
-|$ ./card [-v] FILE...
+|$ ./card [-v] [-c [--offline]] FILE...
 
-The only option, `-v` (or `--verbose`), prints the internal representation of the deck after the
-output has been generated (see Debugging and caveats).
+The option `-v` (or `--verbose`) prints the internal representation of the
+deck after the output has been generated, and `-c` (or `--check`) checks the
+deck for consistency instead of generating the output (see Debugging and
+caveats).
 / += . "Debugging and caveats" -> !debug-top
 
 Let us write a first deck. Put the following into a file called hello.deck:
@@ -366,9 +368,9 @@ values (extended with `+key value`). Setting a single-valued attribute again
 replaces the old value.
 
 *List attributes must always be set with the plus sign*, even when there is
-only one value. card does not complain otherwise, but it treats the string as
-a list of characters: `// tags foo` tags the card with "f" and "o" (twice).
-Conversely, `+key` after a plain `key` fails with a TypeError. In the
+only one value. card does not complain otherwise (only `--check` warns), but
+it treats the string as a list of characters: `// tags foo` tags the card with
+"f" and "o" (twice). Conversely, `+key` after a plain `key` is an error. In the
 reference below, list attributes are marked [list].
 
 Many list attributes are also _inherited_: when card looks up such an
@@ -395,8 +397,8 @@ Deck attributes:
   the "timeline" series (see Series and tags).
 / += . "Series and tags" -> !series-top
 
-> `html.style` [list]: CSS appended to the generated style sheet. See HTML
-  output.
+> `html.style` [list]: CSS appended to the generated style sheet.
+  See HTML output.
 / += . "HTML output" -> !html-top
 
 > `html.style.file`: the name of the generated style sheet, "style.css" by
@@ -612,8 +614,7 @@ self.conf contains:
 which is how the mentions of str.split() and card.compile_deck() get their
 hyperlinks. Because the URL of a link with a span at the other end always
 goes through Python formatting, literal braces in such a URL must be doubled:
-write "{{" and "}}" for "{" and "}". Otherwise card fails with a KeyError
-(or IndexError, or ValueError).
+write "{{" and "}}" for "{" and "}". Otherwise card reports an error.
 
 The link attribute does not have to be attached to either end of the link. For
 example, the following attribute, attached to some fragment, links a word in
@@ -1042,11 +1043,56 @@ Deck processing happens in the following phases:
 // brief What to do when things go wrong, and known limitations.
 // +# trunk 13
 // +tags internals
-card does very little error checking. Most errors in a cardfile result in a
-Python assertion failure or exception, with a stack trace that points to the
-place in card where the problem was detected, rather than to the line of the
-cardfile. The following tools help to find the problem.
+When card finds an error in the input, it reports the location of the problem
+and stops:
 / id top
+
+; code
+|$ ./card notes.deck
+|notes.deck:12: link ". "Hugo" -> !hugo-top" refers to unknown identifier "hugo-top".
+
+Many inconsistencies, however, do not stop card: a link whose regular
+expression matches nothing is silently not rendered, and a misspelled URL
+produces a broken hyperlink. To find them, check the deck:
+
+; code
+|$ ./card --check self.conf self.deck
+
+With `--check` (or `-c`), card builds the deck in a temporary directory,
+leaving the output directory alone, and reports the problems it finds, each
+with its location:
+/ id check
+
+> – errors in the input that stop card;
+
+> – link and note regular expressions that match nothing (an automatic link
+  defined on the deck or a card is reported only if it matches nothing at
+  all);
+
+> – hyperlinks and images referring to files that do not exist in the output
+  directory;
+
+> – external URLs (of links and images) that do not exist. Each page is
+  requested once, with a HEAD request falling back to GET. A missing page
+  (an HTTP error 4xx) is an error, while a server error or a network failure,
+  which can be transient, is a warning. `--offline` skips this check;
+
+> – formulae that TeX does not accept. If pdflatex (or latex) is installed,
+  each card's formulae, display and inline, are typeset together with its
+  `TeX` definitions in a LaTeX document with the amsmath, amssymb and amscd
+  packages. Without TeX, only braces, environments and \left and \right are
+  checked. MathJax and LaTeX are not identical, so an occasional formula can
+  be accepted by one and rejected by the other;
+
+> – generated HTML that is not well-formed, such as nested hyperlinks;
+
+> – warnings: list attributes set without `+`, links with an explicit "!"
+  end set on a card or the deck, identifiers with spaces, cards overwriting
+  each other's output files, numeric series positions of different lengths
+  and timeline positions that do not start with a date.
+
+The exit status is 1 if there are errors and 0 otherwise. The following tools
+help to find the cause of a problem.
 
 > – `-v` prints the internal representation of the deck: all nodes with their
   attributes, layout commands and text. It is printed after the output has
@@ -1062,25 +1108,26 @@ cardfile. The following tools help to find the problem.
 > – `frag.id.show` shows the fragment identifiers (see Identifiers).
 / += . "Identifiers" -> !ids-top
 
+card comes with a test suite, which is run from the top directory of the
+repository:
+
+; code
+|$ python3 -m unittest discover -s tests
+
 Common errors and known limitations:
 
-> – A fragment attribute while no fragment is open: assertion failure in the
-  parser. This usually happens when a `/` line follows an empty line, which
-  has already closed the fragment, and also at the start of a card. A `:`
-  line not preceded by a note fails the same way.
+> – A fragment attribute while no fragment is open. This usually happens when
+  a `/` line follows an empty line, which has already closed the fragment,
+  and also at the start of a card. A `:` line not immediately following a
+  note line is reported similarly.
 
 > – An attribute line without a value, including a code line like "// note"
-  that was not protected by `|`: IndexError in the parser.
+  that was not protected by `|`.
 
-> – A `;` line without a fragment type: IndexError. An unknown fragment type:
-  KeyError.
-
-> – A list attribute set without `+`: no error, but the value is split into
-  characters. A `+key` after a plain `key`: TypeError. See Attributes.
+> – A list attribute set without `+`: no error (only a warning from
+  `--check`), but the value is split into characters. A `+key` after a plain
+  `key` is an error. See Attributes.
 / += . "Attributes" -> !attributes-top
-
-> – Duplicate identifiers, or duplicate positions within a series: assertion
-  failure.
 
 > – Unexpected empty cards. A cardfile without explicit `\` lines still forms
   a card, so a configuration file containing only deck attributes produces an
@@ -1092,21 +1139,14 @@ Common errors and known limitations:
   includes the directory, and card fails to create the file. Give such cards
   explicit identifiers, or run card from the directory of the cardfiles.
 
-> – A link to a non-existent identifier: KeyError. A URL containing braces in
-  a link with a span at the other end: KeyError, IndexError or ValueError
-  (see Links).
-/ += . "Links" -> !links-top
-
 > – A link is rendered only at its span ends, so at least one end must be a
   span. A link whose source is a whole node (without a regular expression) is
   silently ignored. A link from a span to a whole node (a card, a fragment or
   a note) is a hyperlink to the anchor of the node.
 
-> – Tags and series positions on fragments are not supported: card fails
-  with a TypeCheckError. Tag cards and put cards in series only.
+> – Only cards can be tagged and placed in series.
 
 > – Empty matches of regular expressions (of links, notes and styles) are
   ignored: "x*" decorates only non-empty runs of "x".
 
-> – A card in the "timeline" series without the `deck.url` deck attribute:
-  ValueError.
+> – A card in the "timeline" series requires the `deck.url` deck attribute.

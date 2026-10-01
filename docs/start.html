@@ -18,8 +18,8 @@
 $ git clone https://github.com/nikitadanilov/card
 $ cd card</code></pre>
 <a name="start-00002"></a><p>card is invoked with a list of cardfiles. All files are read in the order given and together form a single deck:</p>
-<a name="start-00003"></a><pre><code>$ ./card [-v] FILE...</code></pre>
-<a name="start-00004"></a><p>The only option, <code class="inline">-v</code> (or <code class="inline">--verbose</code>), prints the internal representation of the deck after the output has been generated (see <a href="debug.html#debug-top">Debugging and caveats</a>).</p>
+<a name="start-00003"></a><pre><code>$ ./card [-v] [-c [--offline]] FILE...</code></pre>
+<a name="start-00004"></a><p>The option <code class="inline">-v</code> (or <code class="inline">--verbose</code>) prints the internal representation of the deck after the output has been generated, and <code class="inline">-c</code> (or <code class="inline">--check</code>) checks the deck for consistency instead of generating the output (see <a href="debug.html#debug-top">Debugging and caveats</a>).</p>
 <a name="start-00005"></a><p>Let us write a first deck. Put the following into a file called hello.deck:</p>
 <a name="start-00006"></a><pre><code>/// dir out
 // name Hello
