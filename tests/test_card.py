@@ -890,7 +890,6 @@ class TestOutput(CardTest):
 # ----------------------------------------------------------------------
 
 class TestCommandLine(CardTest):
-    @unittest.expectedFailure # Known bug.
     def test_verbose(self):
         (p, tmp) = self.cli(['-v', 'a.deck'], { 'a.deck': CONF + '// id c\n; head\nH\n\n; code\nx\n\nText.\n/ +* "Text" N.\n' })
         self.assertEqual(p.returncode, 0, p.stderr)
