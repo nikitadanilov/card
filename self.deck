@@ -624,11 +624,10 @@ fragment:
 ; code
 |/ += !phases-syntax "sentences" -> . "marginalia"
 
-This works on a fragment, but not on a card or the deck. A link set on a card
-or the deck is created anew for every fragment and note below it. That is what
-makes automatic links with `.` work, but a link with an explicit "!" end set on
-a card produces as many copies of the same link as the card has fragments and
-notes. Put such links on a fragment.
+A link attribute can be set on any node. A link with a `.` end set on a card or the
+deck is created anew for every fragment and note below it, with `.` referring
+to each of them in turn: that is what makes automatic links work. A link
+without a `.` end is created only once.
 
 Note that the source end of a link (the regular expression or the URL) cannot
 contain "->", and identifiers cannot contain spaces.
@@ -1086,9 +1085,8 @@ with its location:
 
 > – generated HTML that is not well-formed, such as nested hyperlinks;
 
-> – warnings: list attributes set without `+`, links with an explicit "!"
-  end set on a card or the deck, identifiers with spaces, cards overwriting
-  each other's output files, numeric series positions of different lengths
+> – warnings: list attributes set without `+`, identifiers with spaces,
+  cards overwriting each other's output files, numeric series positions of different lengths
   and timeline positions that do not start with a date.
 
 The exit status is 1 if there are errors and 0 otherwise. The following tools

@@ -510,19 +510,26 @@ def index_nodes(d : deck) -> None:
         index_node(d, obj)
 
 
-def build_node_links(d : deck, n : node) -> None:
+def build_node_links(d : deck, n : node, done : set) -> None:
     for x in n.ancestry():
         # Links of a fragment are meant for the fragment, not for its notes.
         if isinstance(n, note) and x is n.parent:
             continue
         for (i, l) in enumerate(x.get('=', list, [])):
+            # A link without a "." end does not depend on the node it is
+            # inherited by: create it only once.
+            if all(not e.strip().startswith('.') for e in l.split('->', 1)):
+                if (id(x), i) in done:
+                    continue
+                done.add((id(x), i))
             link(d, n, l, (x, i))
 
 
 def build_links(d : deck) -> None:
+    done = set()
     for n in iter_nodes(d):
         if n is not d:
-            build_node_links(d, n)
+            build_node_links(d, n, done)
 
 
 def attach_styles(n : node) -> None:
@@ -1964,15 +1971,6 @@ def check_deck(files : List[str], offline : bool = False,
     for n in iter_notes(d):
         if n.place.matches == 0:
             p.error(n.where, 'note regular expression "{}" matches nothing.'.format(n.place.pattern))
-    # Links with explicit nodes set on cards or on the deck.
-    seen = set()
-    for l in d.all_links:
-        (x, i) = l.origin
-        if isinstance(x, (card, deck)) and re.search(r'(^|->)\s*!', l.s) and (id(x), i) not in seen:
-            seen.add((id(x), i))
-            p.warning(l.where(), 'link "{}" with an explicit node is set on a {}, so it is '
-                      'instantiated once for every fragment and note below it.'.format(
-                          l.s, type(x).__name__))
     # List attributes set without '+'.
     for n in iter_nodes(d):
         for key in list_attributes:

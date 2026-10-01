@@ -569,6 +569,14 @@ class TestLinks(CardTest):
         b = self.build('// id c\nTwo\n   words.\n/ += . "Two\\s+words" -> https://example.com\n')
         self.assertIn('https://example.com', b.body('c.html'))
 
+    def test_explicit_link_on_card_and_deck(self):
+        b = self.build('/// += !c-t "x" -> https://example.com/d\n'
+                       '// id c\n// += !c-t "y" -> https://example.com/c\n'
+                       'x y\n/ id t\n/ +* "x" Note.\n\nz\n\n; code\nw\n')
+        body = b.body('c.html')
+        self.assertEqual(body.count('https://example.com/d'), 1)
+        self.assertEqual(body.count('https://example.com/c'), 1)
+
     def test_link_in_code(self):
         b = self.build('// id c\n; code\ncall(x)\n/ += . "call" -> https://example.com\n')
         self.assertIn('<code><a href="https://example.com">call</a>(x)</code>', b.body('c.html'))
@@ -1031,8 +1039,8 @@ class TestCheck(CardTest):
         self.assertProblem(p, 4, 'warning', '"html.style" is set without "+"')
 
     def test_explicit_link_on_card(self):
-        self.assertProblem(self.check('// id c\n// += !c-t "x" -> https://example.com\nx\n/ id t\n'),
-                           2, 'warning', 'instantiated once for every fragment')
+        self.assertEqual(self.check('// id c\n// += !c-t "x" -> https://example.com\nx\n/ id t\n'
+                                    '/ +* "x" Note.\n\ny\n'), [])
 
     def test_identifier_with_spaces(self):
         self.assertProblem(self.check('// id my card\nx\n'), 1, 'warning', 'contains spaces')
