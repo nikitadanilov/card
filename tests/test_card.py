@@ -830,6 +830,22 @@ class TestOutput(CardTest):
         b = self.build('/// dir a/b\n/// deck.url https://example.com\n// id c\nx\n', conf = None)
         self.assertTrue(os.path.exists(os.path.join(b.tmp, 'a', 'b', 'c.html')))
 
+    def test_working_directory_restored(self):
+        tmp = tempfile.mkdtemp(prefix = 'card-test-')
+        self.addCleanup(shutil.rmtree, tmp, True)
+        with open(os.path.join(tmp, 'a.deck'), 'w') as fd:
+            fd.write('/// dir a/b\n// id c\nx\n')
+        cwd = os.getcwd()
+        os.chdir(tmp)
+        try:
+            d = cardtool.deck()
+            d.cardread('a.deck')
+            d.crossref()
+            d.build()
+            self.assertEqual(os.getcwd(), os.path.realpath(tmp))
+        finally:
+            os.chdir(cwd)
+
     def test_files(self):
         b = self.build(SERIES)
         for f in ['c1.html', 'c2.html', 'c3.html', 'style.css', 'feed.xml',

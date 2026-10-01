@@ -1325,14 +1325,12 @@ class html_eng(eng):
         self.deck_render_end(self.deck)
     def deck_render_begin(self, d : deck):
         dir = self.deck.get('dir', str, 'html_out')
-        self.changedir = dir != '.'
-        if self.changedir:
-            os.makedirs(dir, exist_ok = True)
-            os.chdir(dir)
+        self.cwd = os.getcwd()
+        os.makedirs(dir, exist_ok = True)
+        os.chdir(dir)
         self.style_build()
     def deck_render_end(self, d : deck):
-        if self.changedir:
-            os.chdir('..')
+        os.chdir(self.cwd)
     def card_render_begin_file(self, d : deck, c : card):
         if c.hasmath:
             self.out('\n'.join(c.join('TeX')) + '\n')
