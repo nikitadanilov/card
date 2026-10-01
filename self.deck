@@ -320,12 +320,12 @@ given by the `;` line preceding it. The following types are supported.
 |/ level 2
 |Inner workings
 
-> `img`: an image. The image is given by the `url` attribute, and its width by
-  the `width` attribute ("50%" by default). The width is written into the
-  width attribute of the HTML img element, so use a number of pixels or a
-  percentage, not an arbitrary CSS length. The text of the fragment, if any,
-  is rendered right after the image, in the same centred line, so it ends up
-  beside the image if there is room and below it otherwise:
+> `img`: an image. The image is given by the `url` attribute (required), and
+  its width by the `width` attribute ("50%" by default). The width is written
+  into the width attribute of the HTML img element, so use a number of pixels
+  or a percentage, not an arbitrary CSS length. The image is centred. The text
+  of the fragment, if any, is rendered below the image, so it can be used as a
+  caption:
 
 ; code
 >>; img
@@ -957,6 +957,8 @@ The following elements and classes are used by the generated HTML:
   header and footer;
 
 > – `code.inline`: inline code produced by the `cd` style;
+
+> – `.image`: the block containing an image and its caption;
 
 > – `span.annotation`: text with a note attached, and the notes themselves;
 

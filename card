@@ -850,7 +850,7 @@ class html_eng(eng):
             para : ('<p{attrs}>',         '</p>'),
             code : ('<pre><code{attrs}>', '</code></pre>'),
             math : ('$$',                 '$$'),
-            img  : ('<p{attrs}><center>', '</center></p>'),
+            img  : ('<div class="image"{attrs}>', '</div>'),
             head : ('<h{level}>',         '</h{level}>')
         }
         self.html_href_pair = ('<a href="{ref}">', '</a>')
@@ -916,6 +916,9 @@ class html_eng(eng):
             '}\n' +
             'mjx-container:not([display="true"]) {\n' +
             '    font-size: 1em !important;\n' +
+            '}\n' +
+            '.image {\n' +
+            '  text-align: center;\n' +
             '}\n' +
             '.align-left {\n' +
             '  display: inline-block;\n' +
@@ -1411,8 +1414,12 @@ class html_eng(eng):
                                                                 'attrs'   : attrs,
                                                                 'level'   : f.get('level', str, '1') }))
         if isinstance(f, img):
-            self.outnl(self.html_img.format(**{ 'url' : f.get('url'),
-                                                'width' : f.get('width', str, '50%') }))
+            if not f.has('url'):
+                raise ValueError('Image fragment {} has no url attribute.'.format(f.id()))
+            self.outnl(self.html_img.format(**{ 'url' : html.escape(f.get('url')),
+                                                'width' : html.escape(f.get('width', str, '50%')) }))
+            if f.content() != '':
+                self.out('<br>')
     def frag_render_content(self, d : deck, c : card, f : frag):
         for c in f.html_cmds:
             self.render_commands[c.opc](self, c, c.node, c.obj)

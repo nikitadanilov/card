@@ -167,7 +167,6 @@ class TestSyntax(CardTest):
         b = self.build('// id c\nText.\n')
         self.assertIsInstance(b.node('c').frags[0], cardtool.para)
 
-    @unittest.expectedFailure # Known bug.
     def test_fragment_types(self):
         b = self.build('// id c\n; para\nP\n\n; code\nC\n\n; math\nx^2\n\n'
                        '; head\nH\n\n; img\n/ url https://example.com/i.png\nI\n')
@@ -312,7 +311,6 @@ class TestFragments(CardTest):
         self.assertIn('<h1>One</h1>', body)
         self.assertIn('<h3>Three</h3>', body)
 
-    @unittest.expectedFailure # Known bug.
     def test_img(self):
         b = self.build('// id c\n; img\n/ url https://example.com/pic.png\nCaption.\n\n; img\n/ url https://example.com/p2.png\n/ width 120\n')
         body = b.body('c.html')
@@ -320,15 +318,16 @@ class TestFragments(CardTest):
         self.assertIn('<img src="https://example.com/p2.png" border="0" width="120">', body)
         self.assertIn('Caption.', body)
 
-    @unittest.expectedFailure # Known bug.
     def test_img_caption_below(self):
         b = self.build('// id c\n; img\n/ url https://example.com/p.png\nCaption.\n')
         self.assertRegex(b.frag('c.html', 'c-00000'), r'<img [^>]*><br>Caption\.')
 
-    @unittest.expectedFailure # Known bug.
     def test_img_indented(self):
-        b = self.build('// id c\n; img\n>/ url https://example.com/p.png\n>Caption.\n')
+        b = self.build('// id c\n; img\n/ url https://example.com/p.png\n>Caption.\n')
         self.assertIn('margin-left: 3em;', b.frag('c.html', 'c-00000'))
+
+    def test_img_without_url_fails(self):
+        self.fails('// id c\n; img\nCaption.\n')
 
     def test_math_fragment(self):
         b = self.build('// id c\n; math\n\\frac{a}{b}\n')
@@ -683,7 +682,6 @@ class TestStyles(CardTest):
         self.assertIn('mathjax', b.html('c.html'))
         self.assertIn('\\(x+1\\)', b.body('c.html'))
 
-    @unittest.expectedFailure # Known bug.
     def test_styles_not_in_code_head_math_img(self):
         b = self.build(STYLES + '// id c\n; code\n_a_\n\n; head\n_b_\n\n; math\n_c_\n\n'
                        '; img\n/ url https://example.com/p.png\n_d_\n')
@@ -847,7 +845,6 @@ class TestOutput(CardTest):
         self.assertRegex(b.body('c.html'), r'^<a name="c"></a><div class="column"><header>N</header>.*'
                          r'<footer></footer></div></body></html>$')
 
-    @unittest.expectedFailure # Known bug.
     def test_everything_valid(self):
         """A deck using every feature produces valid HTML."""
         self.build(STYLES +

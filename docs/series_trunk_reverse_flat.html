@@ -71,11 +71,12 @@
 <a name="html-00016"></a><p>The style sheet starts with built-in rules, which <code class="inline">html.style</code> can override. The following elements and classes are used by the generated HTML:</p>
 <a name="html-00017"></a><p style="margin-left: 3em;">– <code class="inline">.column</code>: the column containing a card; <code class="inline">header</code> and <code class="inline">footer</code>: its   header and footer;</p>
 <a name="html-00018"></a><p style="margin-left: 3em;">– <code class="inline">code.inline</code>: inline code produced by the <code class="inline">cd</code> style;</p>
-<a name="html-00019"></a><p style="margin-left: 3em;">– <code class="inline">span.annotation</code>: text with a note attached, and the notes themselves;</p>
-<a name="html-00020"></a><p style="margin-left: 3em;">– <code class="inline">span.linktarget</code>: the target span of a link;</p>
-<a name="html-00021"></a><p style="margin-left: 3em;">– <code class="inline">.margin-left</code> and <code class="inline">.margin-right</code>: the left and right margins, holding   link marks, fragment identifiers and notes; <code class="inline">span.frag-id</code>: a fragment   identifier;</p>
-<a name="html-00022"></a><p style="margin-left: 3em;">– <code class="inline">.align-left</code>, <code class="inline">.align-right</code> and <code class="inline">.align-centre</code>: the alignment styles;</p>
-<a name="html-00023"></a><p style="margin-left: 3em;">– <code class="inline">table.no-borders</code>: the tables of the series and tag indices.</p><footer><a href="math.html#math">&lt;</a>&nbsp;<a href="series_trunk.html">trunk</a>&nbsp;<a href="phases.html#phases">&gt;</a>&nbsp;&nbsp;&nbsp;<a href="series.html#series">&lt;</a>&nbsp;<a href="series_reference.html">reference</a>&nbsp;&gt;&nbsp;&nbsp;&nbsp;</footer></div><p>&nbsp;</p>\( \def\Bag{\operatorname{Bag}} \)
+<a name="html-00019"></a><p style="margin-left: 3em;">– <code class="inline">.image</code>: the block containing an image and its caption;</p>
+<a name="html-00020"></a><p style="margin-left: 3em;">– <code class="inline">span.annotation</code>: text with a note attached, and the notes themselves;</p>
+<a name="html-00021"></a><p style="margin-left: 3em;">– <code class="inline">span.linktarget</code>: the target span of a link;</p>
+<a name="html-00022"></a><p style="margin-left: 3em;">– <code class="inline">.margin-left</code> and <code class="inline">.margin-right</code>: the left and right margins, holding   link marks, fragment identifiers and notes; <code class="inline">span.frag-id</code>: a fragment   identifier;</p>
+<a name="html-00023"></a><p style="margin-left: 3em;">– <code class="inline">.align-left</code>, <code class="inline">.align-right</code> and <code class="inline">.align-centre</code>: the alignment styles;</p>
+<a name="html-00024"></a><p style="margin-left: 3em;">– <code class="inline">table.no-borders</code>: the tables of the series and tag indices.</p><footer><a href="math.html#math">&lt;</a>&nbsp;<a href="series_trunk.html">trunk</a>&nbsp;<a href="phases.html#phases">&gt;</a>&nbsp;&nbsp;&nbsp;<a href="series.html#series">&lt;</a>&nbsp;<a href="series_reference.html">reference</a>&nbsp;&gt;&nbsp;&nbsp;&nbsp;</footer></div><p>&nbsp;</p>\( \def\Bag{\operatorname{Bag}} \)
 \( \def\foo{\operatorname{foo}} \)
 <div class="column"><header>Mathematics</header>
 <a name="math-top"></a><p>card relies on <a href="https://www.mathjax.org/">MathJax</a> for mathematics. A card that contains mathematics loads <a href="https://www.mathjax.org/">MathJax</a> automatically.</p>
@@ -240,7 +241,7 @@ Another paragraph. Link _to_ it from a particular text in the previous paragraph
 <a name="fragments-00005"></a><pre><code style="margin-left: 6em;">; head
 / level 2
 Inner workings</code></pre>
-<a name="fragments-00006"></a><p style="margin-left: 3em;"><code class="inline">img</code>: an image. The image is given by the <code class="inline">url</code> attribute, and its width by   the <code class="inline">width</code> attribute (&quot;50%&quot; by default). The width is written into the   width attribute of the HTML img element, so use a number of pixels or a   percentage, not an arbitrary CSS length. The text of the fragment, if any,   is rendered right after the image, in the same centred line, so it ends up   beside the image if there is room and below it otherwise:</p>
+<a name="fragments-00006"></a><p style="margin-left: 3em;"><code class="inline">img</code>: an image. The image is given by the <code class="inline">url</code> attribute (required), and   its width by the <code class="inline">width</code> attribute (&quot;50%&quot; by default). The width is written   into the width attribute of the HTML img element, so use a number of pixels   or a percentage, not an arbitrary CSS length. The image is centred. The text   of the fragment, if any, is rendered below the image, so it can be used as a   caption:</p>
 <a name="fragments-00007"></a><pre><code style="margin-left: 6em;">; img
 / url https://upload.wikimedia.org/wikipedia/commons/4/47/PNG_transparency_demonstration_1.png
 / width 30%
