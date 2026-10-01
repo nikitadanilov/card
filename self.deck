@@ -624,10 +624,10 @@ fragment:
 |/ += !phases-syntax "sentences" -> . "marginalia"
 
 This works on a fragment, but not on a card or the deck. A link set on a card
-or the deck is created anew for every fragment below it. That is what makes
-automatic links with `.` work, but a link with an explicit "!" end set on a
-card produces as many copies of the same link as the card has fragments. Put
-such links on a fragment.
+or the deck is created anew for every fragment and note below it. That is what
+makes automatic links with `.` work, but a link with an explicit "!" end set on
+a card produces as many copies of the same link as the card has fragments and
+notes. Put such links on a fragment.
 
 Note that the source end of a link (the regular expression or the URL) cannot
 contain "->", and identifiers cannot contain spaces.
@@ -675,20 +675,13 @@ the note, for example its identifier. Example:
 / +* "one thing" Also described in the next paragraph
 : id one
 / +* "another thing" Which is actually a _generalisation_ of the one thing.
+/ += !phases-syntax "sentences" -> . "marginalia"
+/ += https://www.example.com -> . "inserted"
 / +* "then" Add more colours.
 / +* "demonstration" Add even more colours.
 / +* "purposes" And more
 
 The note's regular expression cannot contain a double quote.
-/ += !phases-syntax "sentences" -> !notes-demo "marginalia"
-/ += https://www.example.com -> !notes-demo "inserted"
-
-If you compare the example with the source of this card, you will see that the
-two link lines are not attached to the result paragraph itself. They are
-attached to the paragraph after it and refer to the result as "!notes-demo"
-instead of ".". This works around a bug in the current version: a fragment's
-link attributes are also applied to each of its notes, so on a fragment with
-notes, links like these come out duplicated and nested.
 
 Notes can contain hyperlinks. A link is added to a note by a `:` line, in the
 same way as a link is added to a fragment by a `/` line. In a note's link
@@ -721,8 +714,8 @@ note by its identifier, which is how links into notes of other cards are made:
 |/ += !notes-linkdemo-see "Links" -> !links-top
 
 Links defined on the card or on the deck, including automatic links, apply to
-notes as well, and, as described above, so do the link attributes of the note's
-fragment.
+notes as well. Link attributes of the note's fragment do not: they apply to the
+fragment only.
 
 A span in a note can be either end of a link. When it is the target, the
 matched text is underlined and the numbered mark linking back to the source is
@@ -1107,10 +1100,6 @@ Common errors and known limitations:
   silently ignored. A link from a span to a whole fragment works, but a link whose target is a whole
   card fails, so link to the first fragment of the card instead, as this
   manual does.
-
-> – A fragment's link attributes are also applied to its notes, which
-  duplicates links on fragments with notes (see Notes).
-/ += . "Notes" -> !notes-top
 
 > – Tags and series positions on fragments are not supported: card fails
   with a TypeCheckError. Tag cards and put cards in series only.

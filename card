@@ -457,8 +457,12 @@ def index_nodes(d : deck) -> None:
 
 
 def build_node_links(d : deck, n : node) -> None:
-    for l in n.join('='):
-        link(d, n, l)
+    for x in n.ancestry():
+        # Links of a fragment are meant for the fragment, not for its notes.
+        if isinstance(n, note) and x is n.parent:
+            continue
+        for l in x.get('=', list, []):
+            link(d, n, l)
 
 
 def build_links(d : deck) -> None:

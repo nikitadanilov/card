@@ -645,7 +645,6 @@ class TestNotes(CardTest):
                        '// id c\nOne thing.\n/ +* "thing" See example.\n')
         self.assertIn('See <a href="https://example.com">example</a>.', b.body('c.html'))
 
-    @unittest.expectedFailure # Known bug.
     def test_fragment_links_not_applied_to_notes(self):
         b = self.build('// id c\nOne thing here.\n/ += . "here" -> https://example.com\n'
                        '/ +* "thing" Not here.\n')
