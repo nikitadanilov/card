@@ -364,23 +364,19 @@ class TestAttributes(CardTest):
         b = self.build('// id c\n// C a comment\nx\n/ C another\n')
         self.assertNotIn('comment', b.body('c.html'))
 
-    @unittest.expectedFailure # Known bug.
     def test_title_name(self):
         b = self.build('// id c\n// name The Name\n// label The Label\nx\n')
         self.assertIn('<title>The Name</title>', b.html('c.html'))
         self.assertIn('<header>The Name</header>', b.html('c.html'))
 
-    @unittest.expectedFailure # Known bug.
     def test_title_label(self):
         b = self.build('// id c\n// label The Label\nx\n')
         self.assertIn('<title>The Label</title>', b.html('c.html'))
 
-    @unittest.expectedFailure # Known bug.
     def test_title_default(self):
         b = self.build('// id c\nx\n')
         self.assertIn('<title>Card c</title>', b.html('c.html'))
 
-    @unittest.expectedFailure # Known bug.
     def test_title_escaped(self):
         b = self.build('// id c\n// name A & <B>\n// +# s 1\n// +tags t\nx\n')
         self.assertIn('<title>A &amp; &lt;B&gt;</title>', b.html('c.html'))

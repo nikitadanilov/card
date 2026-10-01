@@ -997,7 +997,7 @@ class html_eng(eng):
         self.commands[c.opc](self, c, c.node, c.obj)
     def file_begin(self, title : str, style : str, anchor : str, math : str, n : node):
         head_matter = '\n'.join(n.join('html.head'))
-        title = ' '.join(n.join('html.title')) + ' ' + title
+        title = html.escape(' '.join(n.join('html.title') + [title]))
         self.out(self.html_card_begin.format(**{ 'title'     : title,
                                                  'stylefile' : self.style_file,
                                                  'style'     : style,
@@ -1326,11 +1326,11 @@ class html_eng(eng):
             self.out('\n'.join(c.join('TeX')) + '\n')
         self.out('<div class="column">')
         self.out('<header>')
-        self.out(c.get('card-title', str, 'Card'))
+        self.render_text(c.get('card-title', str, 'Card'))
         self.out('</header>')
     def card_render_begin(self, d : deck, c : card):
         self.fd = open(c.get(html_file, str, None), 'w')
-        title = html.escape(c.get('name', str, c.get('label', str, 'Card {}'.format(c.id()))))
+        title = c.get('name', str, c.get('label', str, 'Card {}'.format(c.id())))
         c.set('card-title', title)
         self.file_begin(title, self.style_text(c), c.get(html_anchor, str, None),
                         self.html_math_script if c.hasmath else '', c)
