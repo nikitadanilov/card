@@ -1392,6 +1392,8 @@ class html_eng(eng):
             if f.has(fmt(':html-note-{}')):
                 self.out(fmt('<p class="margin-{}">'))
                 for m in f.get(fmt(':html-note-{}'), list, []):
+                    if isinstance(m, note):
+                        self.out(self.html_anchor.format(**{ 'anchor' : m.get(html_anchor) }))
                     self.out('<span class="annotation" data-uid="{}">'.format(m.idx % len(self.html_note_colours)))
                     if isinstance(m, note):
                         self.render_inline_node(m)

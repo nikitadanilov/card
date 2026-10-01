@@ -529,8 +529,6 @@ is "ids-top", while this paragraph is "ids-00002".
 The identifier of a note is formed in the same way from the identifier of its
 fragment: FRAGMENT-ID followed by a dash and the note's `id` attribute, or, if
 the note has none, FRAGMENT-ID-note-00000, FRAGMENT-ID-note-00001 and so on.
-Note, however, that no HTML anchor is written for notes, so a link whose
-target is a whole note leads nowhere.
 
 Identifiers must be unique in the deck. Identifiers containing spaces cannot be
 used in links, so do not use them.
@@ -728,9 +726,8 @@ fragment.
 
 A span in a note can be either end of a link. When it is the target, the
 matched text is underlined and the numbered mark linking back to the source is
-placed in the left margin of the note's fragment. However, notes have no HTML
-anchors, so hyperlinks leading to a note, as well as the back-links of links
-whose source is in a note, lead nowhere.
+placed in the left margin of the note's fragment. Hyperlinks leading to a
+note, or to a span in a note, lead to the note in the right margin.
 
 \
 
@@ -924,9 +921,9 @@ contains:
 / += . "Series and tags" -> !series-top
 
 Each card is rendered as a column with a header (containing the card's title)
-and a footer (containing the series navigation). Each fragment is preceded by
-an HTML anchor, named after the fragment's identifier, so any fragment can be
-linked to from outside as FILE.html#IDENTIFIER. Each page also refers to the
+and a footer (containing the series navigation). Each fragment and each note
+is preceded by an HTML anchor, named after its identifier, so any fragment or
+note can be linked to from outside as FILE.html#IDENTIFIER. Each page also refers to the
 RSS feed at deck.url/feed.xml, so set `deck.url` for published decks. Cards
 with mathematics load MathJax 3 (with the amscd package) from the jsDelivr
 CDN.
@@ -1109,10 +1106,7 @@ Common errors and known limitations:
   span. A link whose source is a whole node (without a regular expression) is
   silently ignored. A link from a span to a whole fragment works, but a link whose target is a whole
   card fails, so link to the first fragment of the card instead, as this
-  manual does. There are no HTML anchors for notes, so links to whole notes lead
-  nowhere, and so do hyperlinks to spans in notes and the back-links of links
-  whose source is a span in a note (see Notes).
-/ += . "Notes" -> !notes-top
+  manual does.
 
 > – A fragment's link attributes are also applied to its notes, which
   duplicates links on fragments with notes (see Notes).

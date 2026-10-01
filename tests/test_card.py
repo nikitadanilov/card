@@ -603,7 +603,8 @@ class TestNotes(CardTest):
     def test_note(self):
         b = self.build('// id c\nOne thing.\n/ +* "thing" A note.\n')
         body = b.body('c.html')
-        self.assertRegex(body, r'<p class="margin-right"><span class="annotation" data-uid="\d">A note\.</span>')
+        self.assertRegex(body, r'<p class="margin-right"><a name="c-00000-note-00000"></a>'
+                         r'<span class="annotation" data-uid="\d">A note\.</span>')
         self.assertRegex(body, r'One <span class="annotation" data-uid="\d">thing</span>\.')
 
     def test_note_on_code(self):
@@ -629,7 +630,6 @@ class TestNotes(CardTest):
                        ': += . "example" -> https://example.com\n')
         self.assertIn('See <a href="https://example.com">example</a>.', b.body('c.html'))
 
-    @unittest.expectedFailure # Known bug.
     def test_link_from_note_to_fragment(self):
         b = self.build('// id c\nOne thing.\n/ +* "thing" See target.\n'
                        ': += . "target" -> !c-t "Target"\n\nTarget.\n/ id t\n')
@@ -652,19 +652,16 @@ class TestNotes(CardTest):
         self.assertIn('Not here.', b.body('c.html'))
         self.assertEqual(b.body('c.html').count('https://example.com'), 1)
 
-    @unittest.expectedFailure # Known bug.
     def test_link_to_span_in_note(self):
         b = self.build('// id c\nSource.\n/ += . "Source" -> !c-p-n "target"\n\n'
                        'One thing.\n/ id p\n/ +* "thing" The target.\n: id n\n')
         self.assertIn('<a href="#c-p-n">Source</a>', b.body('c.html'))
 
-    @unittest.expectedFailure # Known bug.
     def test_link_to_whole_note(self):
         b = self.build('// id c\nSource.\n/ += . "Source" -> !c-p-n\n\n'
                        'One thing.\n/ id p\n/ +* "thing" The note.\n: id n\n')
         self.assertIn('<a href="#c-p-n">Source</a>', b.body('c.html'))
 
-    @unittest.expectedFailure # Known bug.
     def test_back_link_to_note(self):
         b = self.build('// id c\nOne thing.\n/ +* "thing" See target.\n: id n\n'
                        ': += . "target" -> !c-t "Target"\n\nTarget.\n/ id t\n')
