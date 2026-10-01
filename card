@@ -159,7 +159,7 @@ class frag(node):
         out += [cmd(TEXT, text[last:], self)]
         return out
     def program(self):
-        return self.incmd + self.excmd
+        return self.incmd + sum([n.program() for n in self.notes], []) + self.excmd
     def tostring(self) -> List[str]:
         return super().tostring() + ['{'] + self.indent(8, self.lines) + ['--notes--'] + self.indent(8, sum([n.tostring() for n in self.notes], [])) + ['}']
 
@@ -552,7 +552,6 @@ def lower_fragments(d : deck) -> None:
     for n in iter_notes(d):
         n.incmd = lower_inline_node(n)
         n.excmd = []
-        n.html_cmds = n.incmd
 
 
 def wrap_cards(d : deck) -> None:
@@ -1040,7 +1039,7 @@ class html_eng(eng):
         self.frag_begin(c, n, o)
     def math_end(self, c : cmd, n : math, o):
         self.frag_end(c, n, o)
-    def forward(self, c : cmd, f : frag, o):
+    def forward(self, c : cmd, f : node, o):
         f.html_cmds += [c]
     def lsrc_here(self, c : cmd, n : node, o : link):
         self.text(c, n, ' [')
@@ -1058,16 +1057,20 @@ class html_eng(eng):
         self.text(c, n, 'ref-by')
         self.href_end()
         self.text(c, n, '] ')
+    def host(self, n : node) -> frag:
+        """The fragment in whose margins the decorations of n are placed."""
+        return n.parent if isinstance(n, note) else n
     def ltgt_start(self, c : cmd, n : node, o : link):
-        o.idx = n.note_idx
-        n.note_idx += 1
-        n.add(':html-note-left', o)
+        f = self.host(n)
+        o.idx = f.note_idx
+        f.note_idx += 1
+        f.add(':html-note-left', o)
         o.text = '[' + self.href_start_html(n, o.src) + \
             '<span style="color: {}">'.format(self.html_note_colours[o.idx % len(self.html_note_colours)]) + \
-            str(n.parent.ltgt_idx) + \
+            str(f.parent.ltgt_idx) + \
             '</span>' + \
             self.href_end_html() + ']'
-        n.parent.ltgt_idx += 1
+        f.parent.ltgt_idx += 1
         o.quoted = True
         o.br = False
         self.forward(c, n, o)
@@ -1091,7 +1094,7 @@ class html_eng(eng):
         self.out(html.escape(o))
     def style_begin(self, c : cmd, n : node, style : int):
         if style == S_MATH:
-            n.parent.hasmath = True
+            self.host(n).parent.hasmath = True
         self.forward(c, n, style)
     def style_begin_render(self, c : cmd, n : node, style : int):
         self.out(self.html_styles_pair[style][0])
@@ -1374,7 +1377,7 @@ class html_eng(eng):
                     self.href_end()
                 self.out('&nbsp;&nbsp;&nbsp;')
     def render_inline_node(self, n : node):
-        for c in n.incmd:
+        for c in n.html_cmds:
             self.render_commands[c.opc](self, c, c.node, c.obj)
 
     def frag_render_begin(self, d : deck, c : card, f : frag):
