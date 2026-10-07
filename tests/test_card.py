@@ -922,9 +922,12 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if self.path == '/nohead' and self.command == 'HEAD':
             code = 405
         self.send_response(code)
+        self.send_header('Content-Type', 'text/html')
         self.end_headers()
     def do_GET(self):
         self.do_HEAD()
+        if self.path in ('/ok', '/nohead'):
+            self.wfile.write(b'<html><body><a name="x"></a><p id="y">Text</p></body></html>')
     def log_message(self, *args):
         pass
 
@@ -1078,6 +1081,14 @@ class TestCheck(CardTest):
         self.assertProblem(p, 4, 'error', '/gone: HTTP 404')
         self.assertProblem(p, 5, 'warning', '/busy: HTTP 503')
         self.assertEqual(len(p), 2)
+
+    def test_url_anchors(self):
+        u = self.url
+        p = self.check('// id c\na b c d\n/ += . "a" -> {0}/ok#x\n/ += . "b" -> {0}/ok#y\n'
+                       '/ += . "c" -> {0}/ok#z\n/ += . "d" -> {0}/ok#:~:text=Text\n'.format(u),
+                       offline = False)
+        self.assertProblem(p, 5, 'error', '/ok#z: no anchor "z"')
+        self.assertEqual(len(p), 1)
 
     def test_url_of_automatic_link(self):
         p = self.check('/// += . "(?P<n>gone)" -> {}/{{n}}\n// id c\nIt is gone.\n'.format(self.url),

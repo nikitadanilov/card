@@ -1782,21 +1782,29 @@ class problems:
 list_attributes = { 'tags', '#', '=', 'TeX', 'html.style', 'html.head', 'html.title',
                     'frag.id.show' } | set(stylenames)
 
-def check_url(url : str, timeout : float = 15):
+def check_url(url : str, timeout : float = 15, anchors : bool = False):
     """Checks that an external resource exists.
 
-    Returns None, or a pair (kind, message), where kind is 'error' if the
-    resource does not exist and 'warning' if the failure can be transient.
+    Returns a pair (err, names): err is None, or a pair (kind, message), where
+    kind is 'error' if the resource does not exist and 'warning' if the
+    failure can be transient; names is, if anchors are requested and the
+    resource is an HTML page, the set of the anchors (id and name attributes)
+    in it, None otherwise.
     """
     if not re.match(r'^https?://', url):
-        return None
+        return (None, None)
     headers = { 'User-Agent' : 'Mozilla/5.0 (compatible; card-check)' }
     err = None
-    for method in ['HEAD', 'GET']:
+    for method in (['GET'] if anchors else ['HEAD', 'GET']):
         try:
             req = urllib.request.Request(url, headers = headers, method = method)
             with urllib.request.urlopen(req, timeout = timeout) as r:
-                return None
+                if method == 'GET' and anchors and 'html' in r.headers.get('Content-Type', 'text/html'):
+                    text = r.read().decode(r.headers.get_content_charset() or 'latin-1', errors = 'replace')
+                    names = set(html.unescape(m.group(2)) for m in
+                                re.finditer(r'\b(id|name)\s*=\s*["\']([^"\']*)["\']', text, re.I))
+                    return (None, names)
+                return (None, None)
         except urllib.error.HTTPError as e:
             transient = e.code == 429 or e.code >= 500
             err = ('warning' if transient else 'error', 'HTTP {} {}'.format(e.code, e.reason))
@@ -1805,7 +1813,15 @@ def check_url(url : str, timeout : float = 15):
         except Exception as e:
             err = ('warning', str(getattr(e, 'reason', e)))
             break
-    return err
+    return (err, None)
+
+def fragment_of(url : str) -> Optional[str]:
+    """The fragment of the URL that names an anchor, or None (no fragment,
+    or a text fragment "#:~:text=...")."""
+    frag = url.partition('#')[2]
+    if frag == '' or frag.startswith(':~:'):
+        return None
+    return urllib.parse.unquote(frag)
 
 def tex_macros(c : card) -> List[str]:
     """TeX definitions of a card, without the math delimiters."""
@@ -2020,12 +2036,18 @@ def check_deck(files : List[str], offline : bool = False,
                 p.error(w, '"{}" does not exist in the output directory {}.'.format(url, outdir))
     if not offline and external:
         pages = sorted(external)
+        def check(page):
+            return check_url(page, anchors = any(fragment_of(u) for u in external[page]))
         with concurrent.futures.ThreadPoolExecutor(max_workers = 8) as pool:
-            for (page, err) in zip(pages, pool.map(check_url, pages)):
-                if err != None:
-                    for url in external[page]:
+            for (page, (err, names)) in zip(pages, pool.map(check, pages)):
+                for url in external[page]:
+                    msg = err
+                    frag = fragment_of(url)
+                    if msg == None and names != None and frag != None and frag not in names:
+                        msg = ('error', 'no anchor "{}" in the page'.format(frag))
+                    if msg != None:
                         for w in sorted(set(urls[url]), key = lambda w: (w or ('', 0))):
-                            p.add(w, err[0], '{}: {}.'.format(url, err[1]))
+                            p.add(w, msg[0], '{}: {}.'.format(url, msg[1]))
     # Mathematics.
     if tex == 'auto':
         tex = shutil.which('pdflatex') or shutil.which('latex')

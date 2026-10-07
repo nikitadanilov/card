@@ -1074,7 +1074,10 @@ with its location:
 > – external URLs (of links and images) that do not exist. Each page is
   requested once, with a HEAD request falling back to GET. A missing page
   (an HTTP error 4xx) is an error, while a server error or a network failure,
-  which can be transient, is a warning. `--offline` skips this check;
+  which can be transient, is a warning. If a URL has a fragment ("page#name"),
+  the page is fetched with GET and the fragment must be the id or name of an
+  element of the page (text fragments, "#:~:text=...", are not checked).
+  `--offline` skips this check;
 
 > – formulae that TeX does not accept. If pdflatex (or latex) is installed,
   each card's formulae, display and inline, are typeset together with its
