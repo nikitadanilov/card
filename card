@@ -969,6 +969,9 @@ class html_eng(eng):
             'span.annotation span.annotation span.annotation { padding-bottom:6px; }\n' +
             'span.annotation span.annotation span.annotation span.annotation { padding-bottom:8px; }\n' +
             'span.frag-id { color: #aaaaaa; font-size: 15px; }\n'                  +
+            'div.footnotes { border-top: 1px solid #cccccc; margin-top: 1em; padding-top: 0.5em; font-size: 80%; }\n' +
+            'p.footnote { margin: 0.2em 0; }\n'                                      +
+            'a.footnote-ref { color: #aaaaaa; margin-right: 0.5em; }\n'               +
             'span.linktarget { border-bottom: 2px solid; }\n'                  +
             '\n' +
             '.column {\n' +
@@ -1118,6 +1121,7 @@ class html_eng(eng):
         n.ltgt_idx = 0
         n.series = []
         n.hasmath = False
+        n.footnotes = []
     def card_end(self, c : cmd, n : card, o):
         assert o == None
         self.indent -= 1
@@ -1190,7 +1194,10 @@ class html_eng(eng):
         o.idx = n.note_idx
         o.br = True
         n.note_idx += 1
-        n.add(':html-note-right', o)
+        if o.get('place', str, 'margin') == 'foot':
+            n.parent.footnotes.append(o)  # Rendered at the bottom of the card.
+        else:
+            n.add(':html-note-right', o)
         self.forward(c, n, o)
     def note_start_render(self, c : cmd, n : node, o : note):
         self.out('<span class="annotation" data-uid="{}">'.format(o.idx % len(self.html_note_colours)))
@@ -1443,7 +1450,27 @@ class html_eng(eng):
         self.file_begin(title, self.style_text(c), c.get(html_anchor, str, None),
                         self.html_math_script if c.hasmath else '', c)
         self.card_render_begin_file(d, c)
+    def card_render_footnotes(self, d : deck, c : card):
+        """The notes placed at the foot of the card, in the order of their
+        fragments, each with a link back to its fragment, labelled with the
+        identifier of the fragment within the card."""
+        if not getattr(c, 'footnotes', []):
+            return
+        self.out('<div class="footnotes">')
+        for n in c.footnotes:
+            f = n.parent
+            label = f.get('id') if f.has('id') else str(f.get('seq', int, 0))
+            self.out('<p class="footnote">')
+            self.out(self.html_anchor.format(**{ 'anchor' : n.get(html_anchor) }))
+            self.out('<a class="footnote-ref" href="{}">'.format(self.href(n, f)))
+            self.render_text(label)
+            self.out('</a> ')
+            self.out('<span class="annotation" data-uid="{}">'.format(n.idx % len(self.html_note_colours)))
+            self.render_inline_node(n)
+            self.out('</span></p>')
+        self.out('</div>')
     def card_render_end_file(self, d : deck, c : card):
+        self.card_render_footnotes(d, c)
         self.out('<footer>')
         self.card_render_series(d, c)
         self.out('</footer>')
@@ -2017,6 +2044,8 @@ def check_deck(files : List[str], offline : bool = False,
     for n in iter_notes(d):
         if n.place.matches == 0:
             p.error(n.where, 'note regular expression "{}" matches nothing.'.format(n.place.pattern))
+        if n.get('place', str, 'margin') not in ('margin', 'foot'):
+            p.error(n.attr_where('place'), 'note attribute "place" is "{}", expected "margin" or "foot".'.format(n.get('place')))
     # List attributes set without '+'.
     for n in iter_nodes(d):
         for key in list_attributes:

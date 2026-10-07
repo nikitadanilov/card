@@ -3,6 +3,9 @@ span.annotation span.annotation { padding-bottom:4px; }
 span.annotation span.annotation span.annotation { padding-bottom:6px; }
 span.annotation span.annotation span.annotation span.annotation { padding-bottom:8px; }
 span.frag-id { color: #aaaaaa; font-size: 15px; }
+div.footnotes { border-top: 1px solid #cccccc; margin-top: 1em; padding-top: 0.5em; font-size: 80%; }
+p.footnote { margin: 0.2em 0; }
+a.footnote-ref { color: #aaaaaa; margin-right: 0.5em; }
 span.linktarget { border-bottom: 2px solid; }
 
 .column {

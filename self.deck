@@ -492,6 +492,18 @@ Fragment attributes:
   Notes.
 / += . "Notes" -> !notes-top
 
+Note attributes (set with `:` lines):
+
+> `id`: the identifier of the note (see Identifiers).
+/ += . "Identifiers" -> !ids-top
+
+> `place`: where the note is rendered: "margin" (the default) or "foot" (a
+  footnote at the foot of the card), see Notes.
+/ += . "Notes" -> !notes-foot
+
+> `=` [list]: a link from the note, see Notes.
+/ += . "Notes" -> !notes-linkdemo
+
 Any node:
 
 > `DEBUG`: the debugging level of the node, see Debugging and caveats. Not
@@ -682,6 +694,20 @@ the note, for example its identifier. Example:
 / +* "purposes" And more
 
 The note's regular expression cannot contain a double quote.
+
+A note with the attribute `place` set to "foot" is a footnote: instead of the
+margin, it is rendered at the foot of the card, after the last fragment. Its
+text is underlined in the same colour as the part of the fragment it is
+attached to, and it starts with a link back to the fragment, labelled with
+the fragment's identifier. Footnotes are listed in the order of their
+fragments. The other value of `place`, "margin", is the default.
+/ id foot
+/ +* "foot of the card" Like this one.
+: place foot
+
+; code
+|/ +* "REGEX" TEXT
+|: place foot
 
 Notes can contain hyperlinks. A link is added to a note by a `:` line, in the
 same way as a link is added to a fragment by a `/` line. In a note's link

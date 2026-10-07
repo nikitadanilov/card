@@ -485,6 +485,21 @@ class TestIdentifiers(CardTest):
         self.assertIn('<span class="annotation" data-uid="2">on</span></i>'
                       '<span class="annotation" data-uid="2"> please</span>', html)
 
+    def test_footnotes(self):
+        b = self.build('// id c\nOne two three.\n/ id p\n/ +* "One" In the margin.\n'
+                       '/ +* "two" At the foot.\n: place foot\n/ +* "three" Also.\n: place foot\n')
+        html = b.html('c.html')
+        foot = html[html.index('<div class="footnotes">'):html.index('<footer>')]
+        self.assertIn('At the foot.', foot)
+        self.assertIn('Also.', foot)
+        self.assertNotIn('In the margin.', foot)
+        self.assertIn('<a class="footnote-ref" href="#c-p">p</a>', foot)
+        self.assertLess(foot.index('At the foot.'), foot.index('Also.'))
+        # The lemma is underlined in the colour of its note.
+        uid = re.search(r'<span class="annotation" data-uid="(\d)">At the foot', foot).group(1)
+        self.assertIn('<span class="annotation" data-uid="{}">two</span>'.format(uid), b.frag('c.html', 'c-p'))
+        self.assertNotIn('At the foot.', b.frag('c.html', 'c-p'))
+
     def test_note_ids(self):
         b = self.build('// id c\na b\n/ id p\n/ +* "a" One.\n/ +* "b" Two.\n: id two\n')
         notes = b.node('c-p').notes
@@ -1096,6 +1111,10 @@ class TestCheck(CardTest):
         self.assertProblem(p, 4, 'error', '/gone: HTTP 404')
         self.assertProblem(p, 5, 'warning', '/busy: HTTP 503')
         self.assertEqual(len(p), 2)
+
+    def test_bad_note_place(self):
+        p = self.check('// id c\nOne.\n/ +* "One" N.\n: place side\n')
+        self.assertProblem(p, 4, 'error', 'expected "margin" or "foot"')
 
     def test_url_anchors(self):
         u = self.url
