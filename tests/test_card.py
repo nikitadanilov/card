@@ -470,6 +470,21 @@ class TestIdentifiers(CardTest):
         for a in ['c-top', 'c-00001', 'c-00002']:
             self.assertIn('<a name="{}"></a>'.format(a), html)
 
+    def test_notes_overlapping_styles(self):
+        # Notes starting with, inside and across italic spans: the HTML is
+        # properly nested (checked by build()) and the note covers exactly
+        # its words.
+        b = self.build('// id c\nNow _Stop his Grog_ and _so on_ please.\n/ id p\n'
+                       '/ +* "Stop" One.\n/ +* "his" Two.\n/ +* "on_ please" Three.\n',
+                       conf = CONF + STYLES)
+        html = b.frag('c.html', 'c-p')
+        self.assertIn('<span class="annotation" data-uid', html)
+        self.assertIn('<span class="annotation" data-uid="0"><i>Stop</i></span>', html)
+        self.assertIn('<span class="annotation" data-uid="1">his</span>', html)
+        # A note across the end of an italic span is split at it.
+        self.assertIn('<span class="annotation" data-uid="2">on</span></i>'
+                      '<span class="annotation" data-uid="2"> please</span>', html)
+
     def test_note_ids(self):
         b = self.build('// id c\na b\n/ id p\n/ +* "a" One.\n/ +* "b" Two.\n: id two\n')
         notes = b.node('c-p').notes

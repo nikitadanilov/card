@@ -1476,9 +1476,40 @@ class html_eng(eng):
                 if next != None:
                     self.href_end()
                 self.out('&nbsp;&nbsp;&nbsp;')
-    def render_inline_node(self, n : node):
-        for c in n.html_cmds:
+    def render_cmds(self, cmds):
+        """Render the commands of a node, keeping the inline elements properly
+        nested: spans of styles, notes and links can overlap (a note on a
+        part of an italic phrase), so when an element is closed while
+        elements opened after it are still open, these are closed before it
+        and reopened after it."""
+        # Inline elements: the command opening an element and the one closing it.
+        close = { STYLE_BEGIN : STYLE_END, NOTE_START : NOTE_END,
+                  LSRC_START : LSRC_END, LTGT_START : LTGT_END }
+        opened = []   # (closing opcode, object, opening command)
+        closers = { v : k for (k, v) in close.items() }
+        def emit(c):
             self.render_commands[c.opc](self, c, c.node, c.obj)
+        for c in cmds:
+            if c.opc in close:
+                emit(c)
+                opened.append((close[c.opc], c.obj, c))
+            elif c.opc in closers:
+                k = next((i for i in range(len(opened) - 1, -1, -1)
+                          if opened[i][0] == c.opc and opened[i][1] is c.obj), None)
+                if k is None:
+                    emit(c)
+                    continue
+                inner = opened[k + 1:]
+                for (opc, obj, b) in reversed(inner):
+                    emit(cmd(opc, obj, b.node))
+                emit(c)
+                for (opc, obj, b) in inner:
+                    emit(b)
+                del opened[k]
+            else:
+                emit(c)
+    def render_inline_node(self, n : node):
+        self.render_cmds(n.html_cmds)
 
     def frag_render_begin(self, d : deck, c : card, f : frag):
         if (f.join('frag.id.show') + ['-'])[0] == '+':
@@ -1517,8 +1548,7 @@ class html_eng(eng):
             if f.content() != '':
                 self.out('<br>')
     def frag_render_content(self, d : deck, c : card, f : frag):
-        for c in f.html_cmds:
-            self.render_commands[c.opc](self, c, c.node, c.obj)
+        self.render_cmds(f.html_cmds)
     def frag_render_end(self, d : deck, c : card, f : frag):
         self.out(self.html_frag_pair[type(f)][1].format(**{ 'level' : f.get('level', str, '1') }))
     def render_text(self, s : str):
