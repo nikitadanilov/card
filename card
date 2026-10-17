@@ -1199,8 +1199,12 @@ class html_eng(eng):
         else:
             n.add(':html-note-right', o)
         self.forward(c, n, o)
+    def note_data(self, o : note) -> str:
+        """The attribute naming a note (its anchor) on the spans of its text
+        and of its lemma, so that a style or script can associate them."""
+        return self.formatif(' data-note="{}"', '', o.get(html_anchor, str, ''))
     def note_start_render(self, c : cmd, n : node, o : note):
-        self.out('<span class="annotation" data-uid="{}">'.format(o.idx % len(self.html_note_colours)))
+        self.out('<span class="annotation" data-uid="{}"{}>'.format(o.idx % len(self.html_note_colours), self.note_data(o)))
     def note_end(self, c : cmd, n : node, o : note):
         self.out('</span>')
     def text(self, c : cmd, n : node, o : str):
@@ -1465,7 +1469,7 @@ class html_eng(eng):
             self.out('<a class="footnote-ref" href="{}">'.format(self.href(n, f)))
             self.render_text(label)
             self.out('</a> ')
-            self.out('<span class="annotation" data-uid="{}">'.format(n.idx % len(self.html_note_colours)))
+            self.out('<span class="annotation" data-uid="{}"{}>'.format(n.idx % len(self.html_note_colours), self.note_data(n)))
             self.render_inline_node(n)
             self.out('</span></p>')
         self.out('</div>')
@@ -1552,7 +1556,8 @@ class html_eng(eng):
                 for m in f.get(fmt(':html-note-{}'), list, []):
                     if isinstance(m, note):
                         self.out(self.html_anchor.format(**{ 'anchor' : m.get(html_anchor) }))
-                    self.out('<span class="annotation" data-uid="{}">'.format(m.idx % len(self.html_note_colours)))
+                    data = self.note_data(m) if isinstance(m, note) else ''
+                    self.out('<span class="annotation" data-uid="{}"{}>'.format(m.idx % len(self.html_note_colours), data))
                     if isinstance(m, note):
                         self.render_inline_node(m)
                     else:
